@@ -48,6 +48,7 @@ function AppRoutes() {
         <Route path="/clients" element={<ClientsPage />} />
         <Route path="/vehicles" element={<VehiclesPage />} />
         <Route path="/incidents" element={<IncidentsPage />} />
+        <Route path="/incidents/:id" element={<IncidentDetailPage />} />
         <Route path="/providers" element={<ServiceProvidersPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         {/* Finance */}
