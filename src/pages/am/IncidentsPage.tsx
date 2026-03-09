@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { StatusBadge } from '@/components/StatusBadge';
 import { incidents } from '@/data/mockData';
@@ -40,8 +41,8 @@ export default function IncidentsPage() {
           </thead>
           <tbody>
             {filtered.map(i => (
-              <tr key={i.id} className="border-b hover:bg-table-hover cursor-pointer">
-                <td className="px-4 py-3 font-mono font-medium text-primary">{i.claimRef}</td>
+              <tr key={i.id} className="border-b hover:bg-table-hover cursor-pointer" onClick={() => {}}>
+                <td className="px-4 py-3 font-mono font-medium"><Link to={`/incidents/${i.id}`} className="text-primary hover:underline">{i.claimRef}</Link></td>
                 <td className="px-4 py-3">{i.clientName}</td>
                 <td className="px-4 py-3 font-mono">{i.vehicleReg}</td>
                 <td className="px-4 py-3">{i.type}</td>

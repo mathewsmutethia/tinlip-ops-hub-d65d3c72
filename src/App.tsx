@@ -11,6 +11,7 @@ import PendingApprovals from "@/pages/am/PendingApprovals";
 import ClientsPage from "@/pages/am/ClientsPage";
 import VehiclesPage from "@/pages/am/VehiclesPage";
 import IncidentsPage from "@/pages/am/IncidentsPage";
+import IncidentDetailPage from "@/pages/am/IncidentDetailPage";
 import ServiceProvidersPage from "@/pages/am/ServiceProvidersPage";
 import SettingsPage from "@/pages/am/SettingsPage";
 import InvoicesPage from "@/pages/finance/InvoicesPage";
@@ -47,6 +48,7 @@ function AppRoutes() {
         <Route path="/clients" element={<ClientsPage />} />
         <Route path="/vehicles" element={<VehiclesPage />} />
         <Route path="/incidents" element={<IncidentsPage />} />
+        <Route path="/incidents/:id" element={<IncidentDetailPage />} />
         <Route path="/providers" element={<ServiceProvidersPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         {/* Finance */}
