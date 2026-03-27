@@ -29,7 +29,11 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 function AppRoutes() {
-  const { isLoggedIn } = useRole();
+  const { isLoggedIn, loading } = useRole();
+
+  if (loading) {
+    return <div className="flex min-h-screen items-center justify-center text-muted-foreground text-sm">Loading...</div>;
+  }
 
   if (!isLoggedIn) {
     return (

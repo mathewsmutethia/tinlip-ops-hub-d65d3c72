@@ -51,7 +51,7 @@ const navItems: Record<UserRole, NavItem[]> = {
 };
 
 export function AppSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
-  const { role, setRole, setIsLoggedIn } = useRole();
+  const { role, setRole, signOut } = useRole();
   const location = useLocation();
   const navigate = useNavigate();
   const [roleSwitcherOpen, setRoleSwitcherOpen] = useState(false);
@@ -174,7 +174,7 @@ export function AppSidebar({ collapsed, onToggle }: { collapsed: boolean; onTogg
           <Tooltip delayDuration={0}>
             <TooltipTrigger asChild>
               <button
-                onClick={() => setIsLoggedIn(false)}
+                onClick={() => signOut()}
                 className="flex w-full items-center justify-center rounded py-1.5 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               >
                 <LogOut className="h-4 w-4" />
@@ -184,7 +184,7 @@ export function AppSidebar({ collapsed, onToggle }: { collapsed: boolean; onTogg
           </Tooltip>
         ) : (
           <button
-            onClick={() => setIsLoggedIn(false)}
+            onClick={() => signOut()}
             className="flex w-full items-center gap-2.5 rounded px-2.5 py-1.5 text-[13px] text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           >
             <LogOut className="h-4 w-4" />
