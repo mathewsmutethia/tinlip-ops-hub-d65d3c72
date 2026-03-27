@@ -1,13 +1,32 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
-import { auditLogs } from '@/data/mockData';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 
+type AuditLog = {
+  id: string;
+  action: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  user_id: string | null;
+  created_at: string;
+};
+
 export default function AuditLogsPage() {
-  const [roleFilter, setRoleFilter] = useState('All');
-  const roles = ['All', 'Account Manager', 'Finance'];
-  const filtered = auditLogs.filter(l => roleFilter === 'All' || l.role === roleFilter);
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase
+      .from('audit_logs')
+      .select('id, action, entity_type, entity_id, user_id, created_at')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        setLogs((data as AuditLog[]) ?? []);
+        setLoading(false);
+      });
+  }, []);
 
   return (
     <div>
@@ -17,39 +36,41 @@ export default function AuditLogsPage() {
         <Button size="sm" variant="outline"><Download className="h-4 w-4 mr-1" /> Export</Button>
       </div>
 
-      <div className="flex gap-1 mb-4">
-        {roles.map(r => (
-          <button key={r} onClick={() => setRoleFilter(r)} className={`px-3 py-1.5 text-xs rounded-md font-medium ${roleFilter === r ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-            {r}
-          </button>
-        ))}
-      </div>
-
       <div className="rounded-lg border bg-card overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/50">
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Timestamp</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Actor</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Role</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Action</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Entity</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Details</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(l => (
-              <tr key={l.id} className="border-b hover:bg-table-hover">
-                <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{l.timestamp}</td>
-                <td className="px-4 py-3 font-medium">{l.actor}</td>
-                <td className="px-4 py-3 text-muted-foreground">{l.role}</td>
-                <td className="px-4 py-3">{l.action}</td>
-                <td className="px-4 py-3 font-mono text-xs">{l.entity}</td>
-                <td className="px-4 py-3 text-muted-foreground">{l.details}</td>
+        {loading ? (
+          <div className="px-4 py-8 text-center text-sm text-muted-foreground">Loading...</div>
+        ) : logs.length === 0 ? (
+          <div className="px-4 py-8 text-center text-sm text-muted-foreground">No audit logs recorded yet.</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50">
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Timestamp</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">User</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Action</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Entity Type</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Entity ID</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {logs.map(l => (
+                <tr key={l.id} className="border-b hover:bg-table-hover">
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                    {new Date(l.created_at).toLocaleString('en-KE')}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs">
+                    {l.user_id ? l.user_id.slice(0, 8) + '…' : '—'}
+                  </td>
+                  <td className="px-4 py-3 font-medium">{l.action}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{l.entity_type ?? '—'}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                    {l.entity_id ? l.entity_id.slice(0, 8) + '…' : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
