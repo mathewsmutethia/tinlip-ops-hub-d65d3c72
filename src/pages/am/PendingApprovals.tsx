@@ -40,9 +40,29 @@ export default function PendingApprovals() {
     setSlideOverOpen(true);
   };
 
+  const createCoverageForVehicle = async (clientId: string, vehicleId: string) => {
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setFullYear(endDate.getFullYear() + 1);
+    await supabase.from('coverage').insert({
+      client_id: clientId,
+      vehicle_id: vehicleId,
+      status: 'active',
+      start_date: today.toISOString().split('T')[0],
+      end_date: endDate.toISOString().split('T')[0],
+    });
+  };
+
   const approveClient = async (id: string) => {
     setActionLoading(true);
     await supabase.from('clients').update({ status: 'active' }).eq('id', id);
+
+    // Create coverage records for all of this client's vehicles
+    const { data: clientVehicles } = await supabase.from('vehicles').select('id').eq('client_id', id);
+    if (clientVehicles && clientVehicles.length > 0) {
+      await Promise.all(clientVehicles.map(v => createCoverageForVehicle(id, v.id)));
+    }
+
     setSlideOverOpen(false);
     fetchData();
     setActionLoading(false);
@@ -60,7 +80,19 @@ export default function PendingApprovals() {
 
   const approveVehicle = async (id: string) => {
     setActionLoading(true);
+
+    // Get the vehicle's client_id before updating
+    const { data: vehicle } = await supabase.from('vehicles').select('client_id').eq('id', id).single();
     await supabase.from('vehicles').update({ status: 'active' }).eq('id', id);
+
+    // Create coverage if the client is already active
+    if (vehicle?.client_id) {
+      const { data: client } = await supabase.from('clients').select('status').eq('id', vehicle.client_id).single();
+      if (client?.status === 'active') {
+        await createCoverageForVehicle(vehicle.client_id, id);
+      }
+    }
+
     setSlideOverOpen(false);
     fetchData();
     setActionLoading(false);
@@ -219,7 +251,7 @@ export default function PendingApprovals() {
                 disabled={actionLoading}
                 onClick={() => isClient ? approveClient(selectedItem.id) : approveVehicle(selectedItem.id)}
               >
-                <Check className="h-4 w-4 mr-1" /> Approve
+                <Check className="h-4 w-4 mr-1" /> {actionLoading ? 'Processing...' : 'Approve'}
               </Button>
               <Button variant="destructive" className="flex-1" disabled={actionLoading} onClick={() => setRejectModalOpen(true)}>
                 <X className="h-4 w-4 mr-1" /> Reject
