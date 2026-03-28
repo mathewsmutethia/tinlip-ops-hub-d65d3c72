@@ -61,7 +61,7 @@ export default function IncidentDetailPage() {
       .select('id, claim_code, type, status, description, location, created_at, notes, clients(name, phone), vehicles(registration)')
       .eq('id', id)
       .single();
-    setIncident(data as Incident | null);
+    setIncident(data as unknown as Incident | null);
     setLoading(false);
   };
 
@@ -94,7 +94,7 @@ export default function IncidentDetailPage() {
         created_at: new Date().toISOString(),
       };
       const updatedNotes = [...(incident.notes ?? []), newNote];
-      const { error } = await supabase.from('incidents').update({ notes: updatedNotes }).eq('id', incident.id);
+      const { error } = await supabase.from('incidents').update({ notes: updatedNotes } as any).eq('id', incident.id);
       if (error) throw error;
       setIncident({ ...incident, notes: updatedNotes });
       setNoteText('');
