@@ -3,21 +3,32 @@ import { useParams, Link } from 'react-router-dom';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { StatusBadge } from '@/components/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
+import { useRole } from '@/contexts/RoleContext';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
   ArrowLeft, Phone, MapPin, Car, User, Clock, MessageSquare, Send,
-  CheckCircle2, Circle, AlertTriangle, Wrench
+  CheckCircle2, Circle, AlertTriangle, Wrench, ShieldCheck
 } from 'lucide-react';
 
 const timelineSteps = [
   { key: 'open', label: 'Reported', icon: AlertTriangle },
   { key: 'in_progress', label: 'In Progress', icon: Clock },
+  { key: 'service_assigned', label: 'Service Assigned', icon: Wrench },
   { key: 'completed', label: 'Completed', icon: CheckCircle2 },
-  { key: 'closed', label: 'Closed', icon: Wrench },
+  { key: 'closed', label: 'Closed', icon: ShieldCheck },
 ];
 
-const statusOrder = ['open', 'in_progress', 'completed', 'closed'];
+const statusOrder = ['open', 'in_progress', 'service_assigned', 'completed', 'closed'];
+
+const statusTransitions: Record<string, { next: string; label: string }> = {
+  open: { next: 'in_progress', label: 'Start Working' },
+  in_progress: { next: 'service_assigned', label: 'Assign Service' },
+  service_assigned: { next: 'completed', label: 'Mark Completed' },
+  completed: { next: 'closed', label: 'Close Incident' },
+};
+
+type PersistedNote = { text: string; author: string; created_at: string };
 
 type Incident = {
   id: string;
@@ -27,25 +38,25 @@ type Incident = {
   description: string | null;
   location: string | null;
   created_at: string;
+  notes: PersistedNote[] | null;
   clients: { name: string; phone: string | null } | null;
   vehicles: { registration: string } | null;
 };
 
-type Note = { id: number; text: string; author: string; time: string };
-
 export default function IncidentDetailPage() {
   const { id } = useParams();
+  const { user } = useRole();
   const [incident, setIncident] = useState<Incident | null>(null);
   const [loading, setLoading] = useState(true);
   const [noteText, setNoteText] = useState('');
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [resolving, setResolving] = useState(false);
+  const [savingNote, setSavingNote] = useState(false);
+  const [advancing, setAdvancing] = useState(false);
 
   const fetchIncident = async () => {
     if (!id) return;
     const { data } = await supabase
       .from('incidents')
-      .select('id, claim_code, type, status, description, location, created_at, clients(name, phone), vehicles(registration)')
+      .select('id, claim_code, type, status, description, location, created_at, notes, clients(name, phone), vehicles(registration)')
       .eq('id', id)
       .single();
     setIncident(data as Incident | null);
@@ -54,18 +65,29 @@ export default function IncidentDetailPage() {
 
   useEffect(() => { fetchIncident(); }, [id]);
 
-  const handleResolve = async () => {
+  const handleAdvanceStatus = async () => {
     if (!incident) return;
-    setResolving(true);
-    await supabase.from('incidents').update({ status: 'closed' }).eq('id', incident.id);
+    const transition = statusTransitions[incident.status];
+    if (!transition) return;
+    setAdvancing(true);
+    await supabase.from('incidents').update({ status: transition.next }).eq('id', incident.id);
     await fetchIncident();
-    setResolving(false);
+    setAdvancing(false);
   };
 
-  const addNote = () => {
-    if (!noteText.trim()) return;
-    setNotes(prev => [...prev, { id: prev.length + 1, text: noteText, author: 'You', time: 'Just now' }]);
+  const addNote = async () => {
+    if (!noteText.trim() || !incident) return;
+    setSavingNote(true);
+    const newNote: PersistedNote = {
+      text: noteText.trim(),
+      author: user?.email ?? 'Admin',
+      created_at: new Date().toISOString(),
+    };
+    const updatedNotes = [...(incident.notes ?? []), newNote];
+    await supabase.from('incidents').update({ notes: updatedNotes }).eq('id', incident.id);
+    setIncident({ ...incident, notes: updatedNotes });
     setNoteText('');
+    setSavingNote(false);
   };
 
   if (loading) return <div className="text-sm text-muted-foreground p-4">Loading...</div>;
@@ -80,6 +102,8 @@ export default function IncidentDetailPage() {
   }
 
   const currentStepIndex = statusOrder.indexOf(incident.status);
+  const transition = statusTransitions[incident.status];
+  const persistedNotes = incident.notes ?? [];
 
   return (
     <div>
@@ -99,16 +123,20 @@ export default function IncidentDetailPage() {
               {incident.type} — {incident.vehicles?.registration ?? '—'}
             </p>
           </div>
-          {incident.status !== 'closed' && (
+          {transition ? (
             <Button
               size="sm"
-              className="bg-success hover:bg-success/90 text-success-foreground"
-              onClick={handleResolve}
-              disabled={resolving}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
+              onClick={handleAdvanceStatus}
+              disabled={advancing}
             >
-              {resolving ? 'Closing...' : 'Mark as Resolved'}
+              {advancing ? 'Updating...' : transition.label}
             </Button>
-          )}
+          ) : incident.status === 'closed' ? (
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-success bg-success/10 px-3 py-1.5 rounded-full">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Resolved
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -205,12 +233,14 @@ export default function IncidentDetailPage() {
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-normal">Not visible to client</span>
             </h3>
             <div className="space-y-3 mb-4 max-h-[240px] overflow-y-auto">
-              {notes.length === 0 && <p className="text-xs text-muted-foreground">No notes yet.</p>}
-              {notes.map(n => (
-                <div key={n.id} className="rounded-md bg-muted/50 px-3 py-2.5 text-sm">
+              {persistedNotes.length === 0 && <p className="text-xs text-muted-foreground">No notes yet.</p>}
+              {persistedNotes.map((n, idx) => (
+                <div key={idx} className="rounded-md bg-muted/50 px-3 py-2.5 text-sm">
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-medium text-xs">{n.author}</span>
-                    <span className="font-mono text-[10px] text-muted-foreground">{n.time}</span>
+                    <span className="font-mono text-[10px] text-muted-foreground">
+                      {new Date(n.created_at).toLocaleString('en-KE')}
+                    </span>
                   </div>
                   <p className="text-muted-foreground">{n.text}</p>
                 </div>
@@ -223,9 +253,9 @@ export default function IncidentDetailPage() {
                 className="flex-1 rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 value={noteText}
                 onChange={e => setNoteText(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addNote()}
+                onKeyDown={e => e.key === 'Enter' && !savingNote && addNote()}
               />
-              <Button size="sm" onClick={addNote} disabled={!noteText.trim()}>
+              <Button size="sm" onClick={addNote} disabled={!noteText.trim() || savingNote}>
                 <Send className="h-3.5 w-3.5 mr-1" /> Add
               </Button>
             </div>
@@ -248,6 +278,10 @@ export default function IncidentDetailPage() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Status</span>
                 <StatusBadge status={incident.status} />
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Notes</span>
+                <span className="font-mono text-xs">{persistedNotes.length}</span>
               </div>
             </div>
           </div>

@@ -44,12 +44,26 @@ export default function ReconciliationPage() {
   const totalConfirmed = payments.filter(p => p.status === 'confirmed').reduce((s, p) => s + (p.amount ?? 0), 0);
   const totalPending = payments.filter(p => p.status === 'pending').reduce((s, p) => s + (p.amount ?? 0), 0);
 
+  const handleExport = () => {
+    const date = new Date().toISOString().slice(0, 10);
+    const exportRows = [
+      ['Month', 'Confirmed (KES)', 'Pending (KES)', 'Net (KES)'],
+      ...rows.map(r => [r.month, String(r.confirmed), String(r.pending), String(r.confirmed - r.pending)]),
+    ];
+    const content = exportRows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `tinlip-reconciliation-${date}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div>
       <Breadcrumbs items={[{ label: 'Home' }, { label: 'Reconciliation' }]} />
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-xl font-semibold">Reconciliation</h1>
-        <Button size="sm" variant="outline"><Download className="h-4 w-4 mr-1" /> Export Report</Button>
+        <Button size="sm" variant="outline" onClick={handleExport} disabled={rows.length === 0}><Download className="h-4 w-4 mr-1" /> Export Report</Button>
       </div>
 
       {loading ? (

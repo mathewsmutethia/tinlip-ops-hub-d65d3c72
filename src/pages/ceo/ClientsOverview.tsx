@@ -34,12 +34,32 @@ export default function ClientsOverview() {
 
   const filtered = statusFilter === 'All' ? clients : clients.filter(c => c.status === statusFilter);
 
+  const handleExport = () => {
+    const date = new Date().toISOString().slice(0, 10);
+    const rows = [
+      ['Name', 'Email', 'Phone', 'Status', 'Joined'],
+      ...filtered.map(c => [
+        c.name ?? '',
+        c.email ?? '',
+        c.phone ?? '',
+        c.status,
+        new Date(c.created_at).toLocaleDateString('en-KE'),
+      ]),
+    ];
+    const content = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `tinlip-clients-${date}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div>
       <Breadcrumbs items={[{ label: 'Home' }, { label: 'Clients Overview' }]} />
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-xl font-semibold">Clients Overview</h1>
-        <Button size="sm" variant="outline"><Download className="h-4 w-4 mr-1" /> Export</Button>
+        <Button size="sm" variant="outline" onClick={handleExport}><Download className="h-4 w-4 mr-1" /> Export</Button>
       </div>
 
       <div className="flex gap-1 mb-4">

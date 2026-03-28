@@ -4,7 +4,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { X, Check, Eye } from 'lucide-react';
+import { X, Check, Eye, ExternalLink, Loader2 } from 'lucide-react';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Client = Tables<'clients'>;
@@ -20,6 +20,8 @@ export default function PendingApprovals() {
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [docUrls, setDocUrls] = useState<Record<string, string | null>>({});
+  const [loadingDocs, setLoadingDocs] = useState(false);
 
   const fetchData = () => {
     setLoading(true);
@@ -35,9 +37,32 @@ export default function PendingApprovals() {
 
   useEffect(() => { fetchData(); }, []);
 
-  const openReview = (item: any) => {
+  const openReview = async (item: any) => {
     setSelectedItem(item);
+    setDocUrls({});
     setSlideOverOpen(true);
+
+    const isClientItem = 'email' in item;
+    const paths: [string, string][] = isClientItem
+      ? item.id_document_url ? [['id', item.id_document_url]] : []
+      : [
+          ...(item.logbook_url ? [['logbook', item.logbook_url] as [string, string]] : []),
+          ...(item.insurance_url ? [['insurance', item.insurance_url] as [string, string]] : []),
+        ];
+
+    if (paths.length === 0) return;
+    setLoadingDocs(true);
+    const urls: Record<string, string | null> = {};
+    await Promise.all(paths.map(async ([key, path]) => {
+      try {
+        const { data } = await supabase.storage.from('documents').createSignedUrl(path, 60);
+        urls[key] = data?.signedUrl ?? null;
+      } catch {
+        urls[key] = null;
+      }
+    }));
+    setDocUrls(urls);
+    setLoadingDocs(false);
   };
 
   const createCoverageForVehicle = async (clientId: string, vehicleId: string) => {
@@ -70,7 +95,7 @@ export default function PendingApprovals() {
 
   const rejectClient = async (id: string) => {
     setActionLoading(true);
-    await supabase.from('clients').update({ status: 'rejected' }).eq('id', id);
+    await supabase.from('clients').update({ status: 'rejected', rejection_reason: rejectReason.trim() || null }).eq('id', id);
     setRejectModalOpen(false);
     setSlideOverOpen(false);
     setRejectReason('');
@@ -100,7 +125,7 @@ export default function PendingApprovals() {
 
   const rejectVehicle = async (id: string) => {
     setActionLoading(true);
-    await supabase.from('vehicles').update({ status: 'rejected' }).eq('id', id);
+    await supabase.from('vehicles').update({ status: 'rejected', rejection_reason: rejectReason.trim() || null }).eq('id', id);
     setRejectModalOpen(false);
     setSlideOverOpen(false);
     setRejectReason('');
@@ -210,12 +235,20 @@ export default function PendingApprovals() {
                     <div><span className="text-muted-foreground">Company:</span> {selectedItem.company_name ?? '—'}</div>
                     <div><span className="text-muted-foreground">Address:</span> {selectedItem.address ?? '—'}</div>
                   </div>
-                  {selectedItem.id_document_url && (
-                    <div className="rounded-md border p-3 bg-muted/50">
-                      <p className="text-xs text-muted-foreground mb-1">ID Document</p>
-                      <a href={selectedItem.id_document_url} target="_blank" rel="noreferrer" className="text-xs text-primary underline">View Document</a>
-                    </div>
-                  )}
+                  <div className="rounded-md border p-3 bg-muted/50">
+                    <p className="text-xs text-muted-foreground mb-1">ID Document</p>
+                    {loadingDocs ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                    ) : docUrls['id'] ? (
+                      <a href={docUrls['id']} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-primary font-medium">
+                        View <ExternalLink className="h-3 w-3" />
+                      </a>
+                    ) : selectedItem.id_document_url ? (
+                      <span className="text-xs text-destructive">URL expired — refresh to retry</span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Not uploaded</span>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -229,18 +262,20 @@ export default function PendingApprovals() {
                     <div><span className="text-muted-foreground">Mileage:</span> <span className="font-mono">{selectedItem.mileage != null ? `${selectedItem.mileage.toLocaleString()} km` : '—'}</span></div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    {selectedItem.logbook_url && (
-                      <div className="rounded-md border p-3 bg-muted/50">
-                        <p className="text-xs text-muted-foreground mb-1">Logbook</p>
-                        <a href={selectedItem.logbook_url} target="_blank" rel="noreferrer" className="text-xs text-primary underline">View</a>
+                    {(['logbook', 'insurance'] as const).map((key) => (
+                      <div key={key} className="rounded-md border p-3 bg-muted/50">
+                        <p className="text-xs text-muted-foreground mb-1 capitalize">{key}</p>
+                        {loadingDocs ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                        ) : docUrls[key] ? (
+                          <a href={docUrls[key]!} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-primary font-medium">
+                            View <ExternalLink className="h-3 w-3" />
+                          </a>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Not uploaded</span>
+                        )}
                       </div>
-                    )}
-                    {selectedItem.insurance_url && (
-                      <div className="rounded-md border p-3 bg-muted/50">
-                        <p className="text-xs text-muted-foreground mb-1">Insurance</p>
-                        <a href={selectedItem.insurance_url} target="_blank" rel="noreferrer" className="text-xs text-primary underline">View</a>
-                      </div>
-                    )}
+                    ))}
                   </div>
                 </div>
               )}

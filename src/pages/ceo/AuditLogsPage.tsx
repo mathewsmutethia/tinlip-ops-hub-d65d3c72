@@ -28,12 +28,32 @@ export default function AuditLogsPage() {
       });
   }, []);
 
+  const handleExport = () => {
+    const date = new Date().toISOString().slice(0, 10);
+    const rows = [
+      ['Timestamp', 'Action', 'Entity Type', 'Entity ID', 'User ID'],
+      ...logs.map(l => [
+        new Date(l.created_at).toLocaleString('en-KE'),
+        l.action,
+        l.entity_type ?? '',
+        l.entity_id ?? '',
+        l.user_id ?? '',
+      ]),
+    ];
+    const content = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `tinlip-audit-${date}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div>
       <Breadcrumbs items={[{ label: 'Home' }, { label: 'Audit Logs' }]} />
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-xl font-semibold">Audit Logs</h1>
-        <Button size="sm" variant="outline"><Download className="h-4 w-4 mr-1" /> Export</Button>
+        <Button size="sm" variant="outline" onClick={handleExport} disabled={logs.length === 0}><Download className="h-4 w-4 mr-1" /> Export</Button>
       </div>
 
       <div className="rounded-lg border bg-card overflow-hidden">
