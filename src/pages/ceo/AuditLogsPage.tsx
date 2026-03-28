@@ -22,6 +22,7 @@ export default function AuditLogsPage() {
       .from('audit_logs')
       .select('id, action, entity_type, entity_id, user_id, created_at')
       .order('created_at', { ascending: false })
+      .limit(500)
       .then(({ data }) => {
         setLogs((data as AuditLog[]) ?? []);
         setLoading(false);

@@ -5,12 +5,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { X, Check, Eye, ExternalLink, Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Client = Tables<'clients'>;
 type Vehicle = Tables<'vehicles'> & { clients: { name: string | null } | null };
 
 export default function PendingApprovals() {
+  const { toast } = useToast();
   const [tab, setTab] = useState<'clients' | 'vehicles'>('clients');
   const [pendingClients, setPendingClients] = useState<Client[]>([]);
   const [pendingVehicles, setPendingVehicles] = useState<Vehicle[]>([]);
@@ -29,8 +31,14 @@ export default function PendingApprovals() {
       supabase.from('clients').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
       supabase.from('vehicles').select('*, clients(name)').eq('status', 'pending').order('created_at', { ascending: false }),
     ]).then(([clientsRes, vehiclesRes]) => {
+      if (clientsRes.error) throw clientsRes.error;
+      if (vehiclesRes.error) throw vehiclesRes.error;
       setPendingClients(clientsRes.data ?? []);
       setPendingVehicles((vehiclesRes.data as Vehicle[]) ?? []);
+      setLoading(false);
+    }).catch(err => {
+      console.error('Failed to load pending approvals:', err);
+      toast({ title: 'Failed to load data', description: 'Please refresh and try again.', variant: 'destructive' });
       setLoading(false);
     });
   };
@@ -55,7 +63,7 @@ export default function PendingApprovals() {
     const urls: Record<string, string | null> = {};
     await Promise.all(paths.map(async ([key, path]) => {
       try {
-        const { data } = await supabase.storage.from('documents').createSignedUrl(path, 60);
+        const { data } = await supabase.storage.from('documents').createSignedUrl(path, 600);
         urls[key] = data?.signedUrl ?? null;
       } catch {
         urls[key] = null;
@@ -80,57 +88,77 @@ export default function PendingApprovals() {
 
   const approveClient = async (id: string) => {
     setActionLoading(true);
-    await supabase.from('clients').update({ status: 'active' }).eq('id', id);
-
-    // Create coverage records for all of this client's vehicles
-    const { data: clientVehicles } = await supabase.from('vehicles').select('id').eq('client_id', id);
-    if (clientVehicles && clientVehicles.length > 0) {
-      await Promise.all(clientVehicles.map(v => createCoverageForVehicle(id, v.id)));
+    try {
+      const { error } = await supabase.from('clients').update({ status: 'active' }).eq('id', id);
+      if (error) throw error;
+      const { data: clientVehicles } = await supabase.from('vehicles').select('id').eq('client_id', id);
+      if (clientVehicles && clientVehicles.length > 0) {
+        await Promise.all(clientVehicles.map(v => createCoverageForVehicle(id, v.id)));
+      }
+      setSlideOverOpen(false);
+      fetchData();
+    } catch (err) {
+      console.error('Failed to approve client:', err);
+      toast({ title: 'Failed to approve client', variant: 'destructive' });
+    } finally {
+      setActionLoading(false);
     }
-
-    setSlideOverOpen(false);
-    fetchData();
-    setActionLoading(false);
   };
 
   const rejectClient = async (id: string) => {
     setActionLoading(true);
-    await supabase.from('clients').update({ status: 'rejected', rejection_reason: rejectReason.trim() || null }).eq('id', id);
-    setRejectModalOpen(false);
-    setSlideOverOpen(false);
-    setRejectReason('');
-    fetchData();
-    setActionLoading(false);
+    try {
+      const { error } = await supabase.from('clients').update({ status: 'rejected', rejection_reason: rejectReason.trim() || null }).eq('id', id);
+      if (error) throw error;
+      setRejectModalOpen(false);
+      setSlideOverOpen(false);
+      setRejectReason('');
+      fetchData();
+    } catch (err) {
+      console.error('Failed to reject client:', err);
+      toast({ title: 'Failed to reject client', variant: 'destructive' });
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const approveVehicle = async (id: string) => {
     setActionLoading(true);
-
-    // Get the vehicle's client_id before updating
-    const { data: vehicle } = await supabase.from('vehicles').select('client_id').eq('id', id).single();
-    await supabase.from('vehicles').update({ status: 'active' }).eq('id', id);
-
-    // Create coverage if the client is already active
-    if (vehicle?.client_id) {
-      const { data: client } = await supabase.from('clients').select('status').eq('id', vehicle.client_id).single();
-      if (client?.status === 'active') {
-        await createCoverageForVehicle(vehicle.client_id, id);
+    try {
+      const { data: vehicle } = await supabase.from('vehicles').select('client_id').eq('id', id).single();
+      const { error } = await supabase.from('vehicles').update({ status: 'active' }).eq('id', id);
+      if (error) throw error;
+      if (vehicle?.client_id) {
+        const { data: client } = await supabase.from('clients').select('status').eq('id', vehicle.client_id).single();
+        if (client?.status === 'active') {
+          await createCoverageForVehicle(vehicle.client_id, id);
+        }
       }
+      setSlideOverOpen(false);
+      fetchData();
+    } catch (err) {
+      console.error('Failed to approve vehicle:', err);
+      toast({ title: 'Failed to approve vehicle', variant: 'destructive' });
+    } finally {
+      setActionLoading(false);
     }
-
-    setSlideOverOpen(false);
-    fetchData();
-    setActionLoading(false);
   };
 
   const rejectVehicle = async (id: string) => {
     setActionLoading(true);
-    await supabase.from('vehicles').update({ status: 'rejected', rejection_reason: rejectReason.trim() || null }).eq('id', id);
-    setRejectModalOpen(false);
-    setSlideOverOpen(false);
-    setRejectReason('');
-    fetchData();
-    setActionLoading(false);
+    try {
+      const { error } = await supabase.from('vehicles').update({ status: 'rejected', rejection_reason: rejectReason.trim() || null }).eq('id', id);
+      if (error) throw error;
+      setRejectModalOpen(false);
+      setSlideOverOpen(false);
+      setRejectReason('');
+      fetchData();
+    } catch (err) {
+      console.error('Failed to reject vehicle:', err);
+      toast({ title: 'Failed to reject vehicle', variant: 'destructive' });
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const isClient = selectedItem && 'email' in selectedItem;

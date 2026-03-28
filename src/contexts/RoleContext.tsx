@@ -41,7 +41,7 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(session);
         setUser(session.user);
         setIsLoggedIn(true);
-        const userRole = session.user.user_metadata?.role as UserRole | undefined;
+        const userRole = session.user.app_metadata?.role as UserRole | undefined;
         setRole(userRole ?? 'account_manager');
       }
       setLoading(false);
@@ -52,7 +52,7 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(session?.user ?? null);
       setIsLoggedIn(!!session);
       if (session?.user) {
-        const userRole = session.user.user_metadata?.role as UserRole | undefined;
+        const userRole = session.user.app_metadata?.role as UserRole | undefined;
         setRole(userRole ?? 'account_manager');
       }
     });

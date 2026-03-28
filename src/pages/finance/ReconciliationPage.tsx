@@ -26,6 +26,7 @@ export default function ReconciliationPage() {
     supabase
       .from('payments')
       .select('id, amount, status, created_at')
+      .limit(1000)
       .then(({ data }) => {
         setPayments((data as Payment[]) ?? []);
         setLoading(false);

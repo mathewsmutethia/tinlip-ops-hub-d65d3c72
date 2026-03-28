@@ -4,6 +4,7 @@ import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { StatusBadge } from '@/components/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { useRole } from '@/contexts/RoleContext';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
@@ -46,6 +47,7 @@ type Incident = {
 export default function IncidentDetailPage() {
   const { id } = useParams();
   const { user } = useRole();
+  const { toast } = useToast();
   const [incident, setIncident] = useState<Incident | null>(null);
   const [loading, setLoading] = useState(true);
   const [noteText, setNoteText] = useState('');
@@ -70,24 +72,38 @@ export default function IncidentDetailPage() {
     const transition = statusTransitions[incident.status];
     if (!transition) return;
     setAdvancing(true);
-    await supabase.from('incidents').update({ status: transition.next }).eq('id', incident.id);
-    await fetchIncident();
-    setAdvancing(false);
+    try {
+      const { error } = await supabase.from('incidents').update({ status: transition.next }).eq('id', incident.id);
+      if (error) throw error;
+      await fetchIncident();
+    } catch (err) {
+      console.error('Failed to advance incident status:', err);
+      toast({ title: 'Failed to update status', variant: 'destructive' });
+    } finally {
+      setAdvancing(false);
+    }
   };
 
   const addNote = async () => {
     if (!noteText.trim() || !incident) return;
     setSavingNote(true);
-    const newNote: PersistedNote = {
-      text: noteText.trim(),
-      author: user?.email ?? 'Admin',
-      created_at: new Date().toISOString(),
-    };
-    const updatedNotes = [...(incident.notes ?? []), newNote];
-    await supabase.from('incidents').update({ notes: updatedNotes }).eq('id', incident.id);
-    setIncident({ ...incident, notes: updatedNotes });
-    setNoteText('');
-    setSavingNote(false);
+    try {
+      const newNote: PersistedNote = {
+        text: noteText.trim(),
+        author: user?.id ?? 'unknown',
+        created_at: new Date().toISOString(),
+      };
+      const updatedNotes = [...(incident.notes ?? []), newNote];
+      const { error } = await supabase.from('incidents').update({ notes: updatedNotes }).eq('id', incident.id);
+      if (error) throw error;
+      setIncident({ ...incident, notes: updatedNotes });
+      setNoteText('');
+    } catch (err) {
+      console.error('Failed to save note:', err);
+      toast({ title: 'Failed to save note', variant: 'destructive' });
+    } finally {
+      setSavingNote(false);
+    }
   };
 
   if (loading) return <div className="text-sm text-muted-foreground p-4">Loading...</div>;
@@ -237,7 +253,7 @@ export default function IncidentDetailPage() {
               {persistedNotes.map((n, idx) => (
                 <div key={idx} className="rounded-md bg-muted/50 px-3 py-2.5 text-sm">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium text-xs">{n.author}</span>
+                    <span className="font-medium text-xs font-mono">{n.author.length > 16 ? n.author.slice(0, 8) + '…' : n.author}</span>
                     <span className="font-mono text-[10px] text-muted-foreground">
                       {new Date(n.created_at).toLocaleString('en-KE')}
                     </span>
