@@ -61,7 +61,7 @@ export default function IncidentDetailPage() {
       .select('id, claim_code, type, status, description, location, created_at, notes, clients(name, phone), vehicles(registration)')
       .eq('id', id)
       .single();
-    setIncident(data as Incident | null);
+    setIncident(data as unknown as Incident | null);
     setLoading(false);
   };
 
