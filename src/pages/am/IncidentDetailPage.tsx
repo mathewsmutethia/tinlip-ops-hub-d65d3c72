@@ -94,7 +94,7 @@ export default function IncidentDetailPage() {
         created_at: new Date().toISOString(),
       };
       const updatedNotes = [...(incident.notes ?? []), newNote];
-      const { error } = await supabase.from('incidents').update({ notes: updatedNotes }).eq('id', incident.id);
+      const { error } = await supabase.from('incidents').update({ notes: updatedNotes } as any).eq('id', incident.id);
       if (error) throw error;
       setIncident({ ...incident, notes: updatedNotes });
       setNoteText('');
