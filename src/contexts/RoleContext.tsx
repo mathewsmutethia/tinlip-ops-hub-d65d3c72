@@ -4,9 +4,14 @@ import type { Session, User } from '@supabase/supabase-js';
 
 export type UserRole = 'account_manager' | 'finance' | 'ceo';
 
+const VALID_ROLES: UserRole[] = ['account_manager', 'finance', 'ceo'];
+
+function resolveRole(raw: unknown): UserRole {
+  return VALID_ROLES.includes(raw as UserRole) ? (raw as UserRole) : 'account_manager';
+}
+
 interface RoleContextType {
   role: UserRole;
-  setRole: (role: UserRole) => void;
   isLoggedIn: boolean;
   setIsLoggedIn: (v: boolean) => void;
   user: User | null;
@@ -17,7 +22,6 @@ interface RoleContextType {
 
 const RoleContext = createContext<RoleContextType>({
   role: 'account_manager',
-  setRole: () => {},
   isLoggedIn: false,
   setIsLoggedIn: () => {},
   user: null,
@@ -41,19 +45,19 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(session);
         setUser(session.user);
         setIsLoggedIn(true);
-        const userRole = session.user.app_metadata?.role as UserRole | undefined;
-        setRole(userRole ?? 'account_manager');
+        setRole(resolveRole(session.user.app_metadata?.role));
       }
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setIsLoggedIn(!!session);
       if (session?.user) {
-        const userRole = session.user.app_metadata?.role as UserRole | undefined;
-        setRole(userRole ?? 'account_manager');
+        setRole(resolveRole(session.user.app_metadata?.role));
+      } else {
+        setRole('account_manager');
       }
     });
 
@@ -65,10 +69,11 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoggedIn(false);
     setUser(null);
     setSession(null);
+    setRole('account_manager');
   };
 
   return (
-    <RoleContext.Provider value={{ role, setRole, isLoggedIn, setIsLoggedIn, user, session, signOut, loading }}>
+    <RoleContext.Provider value={{ role, isLoggedIn, setIsLoggedIn, user, session, signOut, loading }}>
       {children}
     </RoleContext.Provider>
   );

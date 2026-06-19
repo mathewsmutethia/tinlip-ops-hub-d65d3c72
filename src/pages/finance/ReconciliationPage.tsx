@@ -7,9 +7,9 @@ import { Download } from 'lucide-react';
 
 type Payment = {
   id: string;
-  amount: number;
-  status: string;
-  created_at: string;
+  amount: number | null;
+  status: string | null;
+  created_at: string | null;
 };
 
 type MonthRow = {
@@ -27,14 +27,16 @@ export default function ReconciliationPage() {
       .from('payments')
       .select('id, amount, status, created_at')
       .limit(1000)
-      .then(({ data }) => {
-        setPayments((data as Payment[]) ?? []);
+      .then(({ data, error }) => {
+        if (error) console.error('Failed to load payments:', error);
+        else setPayments((data as Payment[]) ?? []);
         setLoading(false);
       });
   }, []);
 
   const monthlyMap: Record<string, MonthRow> = {};
   payments.forEach(p => {
+    if (!p.created_at) return;
     const month = p.created_at.slice(0, 7);
     if (!monthlyMap[month]) monthlyMap[month] = { month, confirmed: 0, pending: 0 };
     if (p.status === 'confirmed') monthlyMap[month].confirmed += p.amount ?? 0;

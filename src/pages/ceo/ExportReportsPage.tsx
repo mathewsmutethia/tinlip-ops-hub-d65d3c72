@@ -1,15 +1,20 @@
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { Button } from '@/components/ui/button';
-import { Download, FileText, FileSpreadsheet } from 'lucide-react';
+import { Download, FileText } from 'lucide-react';
+import { toast } from 'sonner';
+
+const reports = [
+  { name: 'Client Summary Report', description: 'Overview of all clients, cohorts, and coverage status', formats: ['CSV', 'PDF'] },
+  { name: 'Incidents Report', description: 'All incidents with status, response times, and provider details', formats: ['CSV', 'PDF'] },
+  { name: 'Financial Overview', description: 'Premiums collected, claims paid, and net position', formats: ['CSV', 'PDF'] },
+  { name: 'Audit Trail Export', description: 'Complete audit log of all system actions', formats: ['CSV'] },
+  { name: 'SLA Compliance Report', description: 'Response times, breaches, and provider performance', formats: ['PDF'] },
+];
 
 export default function ExportReportsPage() {
-  const reports = [
-    { name: 'Client Summary Report', description: 'Overview of all clients, cohorts, and coverage status', formats: ['CSV', 'PDF'] },
-    { name: 'Incidents Report', description: 'All incidents with status, response times, and provider details', formats: ['CSV', 'PDF'] },
-    { name: 'Financial Overview', description: 'Premiums collected, claims paid, and net position', formats: ['CSV', 'PDF'] },
-    { name: 'Audit Trail Export', description: 'Complete audit log of all system actions', formats: ['CSV'] },
-    { name: 'SLA Compliance Report', description: 'Response times, breaches, and provider performance', formats: ['PDF'] },
-  ];
+  const handleExport = (reportName: string, format: string) => {
+    toast.info(`${reportName} (${format}) export is not yet implemented.`);
+  };
 
   return (
     <div>
@@ -17,8 +22,8 @@ export default function ExportReportsPage() {
       <h1 className="text-xl font-semibold mb-5">Export Reports</h1>
 
       <div className="space-y-3">
-        {reports.map((r, i) => (
-          <div key={i} className="flex items-center justify-between rounded-lg border bg-card p-4">
+        {reports.map((r) => (
+          <div key={r.name} className="flex items-center justify-between rounded-lg border bg-card p-4">
             <div className="flex items-center gap-3">
               <FileText className="h-5 w-5 text-muted-foreground" />
               <div>
@@ -28,7 +33,13 @@ export default function ExportReportsPage() {
             </div>
             <div className="flex gap-2">
               {r.formats.map(f => (
-                <Button key={f} size="sm" variant="outline" className="h-8 text-xs">
+                <Button
+                  key={f}
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs"
+                  onClick={() => handleExport(r.name, f)}
+                >
                   <Download className="h-3.5 w-3.5 mr-1" /> {f}
                 </Button>
               ))}

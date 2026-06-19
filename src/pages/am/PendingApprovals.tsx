@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { StatusBadge } from '@/components/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
+import { useRole } from '@/contexts/RoleContext';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { X, Check, Eye, ExternalLink, Loader2 } from 'lucide-react';
@@ -9,14 +10,15 @@ import { toast } from 'sonner';
 import { Drawer } from 'vaul';
 import type { Tables } from '@/integrations/supabase/types';
 
-type Client = Tables<'clients'>;
-type Vehicle = Tables<'vehicles'> & { clients: { name: string | null } | null };
+type Client = Pick<Tables<'clients'>, 'id' | 'name' | 'email' | 'phone' | 'id_number' | 'company_name' | 'address' | 'status' | 'created_at' | 'id_document_url'>;
+type Vehicle = Pick<Tables<'vehicles'>, 'id' | 'client_id' | 'registration' | 'make' | 'model' | 'year' | 'engine_number' | 'chassis_number' | 'mileage' | 'status' | 'logbook_url' | 'insurance_url'> & { clients: { name: string | null } | null };
 
 function isClientItem(item: Client | Vehicle): item is Client {
   return 'email' in item;
 }
 
 export default function PendingApprovals() {
+  const { user } = useRole();
   const [tab, setTab] = useState<'clients' | 'vehicles'>('clients');
   const [pendingClients, setPendingClients] = useState<Client[]>([]);
   const [pendingVehicles, setPendingVehicles] = useState<Vehicle[]>([]);
@@ -32,8 +34,8 @@ export default function PendingApprovals() {
   const fetchData = () => {
     setLoading(true);
     Promise.all([
-      supabase.from('clients').select('*').eq('status', 'pending_approval').order('created_at', { ascending: false }),
-      supabase.from('vehicles').select('*, clients(name)').eq('status', 'pending').order('created_at', { ascending: false }),
+      supabase.from('clients').select('id, name, email, phone, id_number, company_name, address, status, created_at, id_document_url').eq('status', 'pending_approval').order('created_at', { ascending: false }),
+      supabase.from('vehicles').select('id, client_id, registration, make, model, year, engine_number, chassis_number, mileage, status, logbook_url, insurance_url, clients(name)').eq('status', 'pending').order('created_at', { ascending: false }),
     ]).then(([clientsRes, vehiclesRes]) => {
       if (clientsRes.error) throw clientsRes.error;
       if (vehiclesRes.error) throw vehiclesRes.error;
@@ -62,9 +64,15 @@ export default function PendingApprovals() {
         ];
 
     if (paths.length === 0) return;
+    const ownerId = isClientItem(item) ? item.id : item.client_id;
     setLoadingDocs(true);
     const urls: Record<string, string | null> = {};
     await Promise.all(paths.map(async ([key, path]) => {
+      if (!ownerId || !path.startsWith(ownerId)) {
+        console.error('Storage path ownership mismatch — blocked:', path);
+        urls[key] = null;
+        return;
+      }
       try {
         const { data } = await supabase.storage.from('documents').createSignedUrl(path, 600);
         urls[key] = data?.signedUrl ?? null;
@@ -74,6 +82,16 @@ export default function PendingApprovals() {
     }));
     setDocUrls(urls);
     setLoadingDocs(false);
+  };
+
+  const writeAuditLog = async (action: string, entityType: string, entityId: string) => {
+    const { error } = await supabase.from('audit_logs').insert({
+      action,
+      entity_type: entityType,
+      entity_id: entityId,
+      user_id: user?.id ?? null,
+    });
+    if (error) console.error('Audit log write failed:', error);
   };
 
   const createCoverageForVehicle = async (clientId: string, vehicleId: string) => {
@@ -95,10 +113,13 @@ export default function PendingApprovals() {
     try {
       const { error } = await supabase.from('clients').update({ status: 'active' }).eq('id', id);
       if (error) throw error;
-      const { data: clientVehicles } = await supabase.from('vehicles').select('id').eq('client_id', id).eq('status', 'active');
+      await writeAuditLog('client_approved', 'client', id);
+      const { data: clientVehicles, error: vErr } = await supabase.from('vehicles').select('id').eq('client_id', id).eq('status', 'active');
+      if (vErr) throw vErr;
       if (clientVehicles && clientVehicles.length > 0) {
         await Promise.all(clientVehicles.map(v => createCoverageForVehicle(id, v.id)));
       }
+      toast.success('Client approved');
       setDrawerOpen(false);
       fetchData();
     } catch (err) {
@@ -114,9 +135,11 @@ export default function PendingApprovals() {
     try {
       const { error } = await supabase.from('clients').update({ status: 'rejected', rejection_reason: rejectReason.trim() || null }).eq('id', id);
       if (error) throw error;
+      await writeAuditLog('client_rejected', 'client', id);
       setRejectModalOpen(false);
       setDrawerOpen(false);
       setRejectReason('');
+      toast.success('Client rejected');
       fetchData();
     } catch (err) {
       console.error('Failed to reject client:', err);
@@ -132,12 +155,14 @@ export default function PendingApprovals() {
       const { data: vehicle } = await supabase.from('vehicles').select('client_id').eq('id', id).single();
       const { error } = await supabase.from('vehicles').update({ status: 'active' }).eq('id', id);
       if (error) throw error;
+      await writeAuditLog('vehicle_approved', 'vehicle', id);
       if (vehicle?.client_id) {
         const { data: client } = await supabase.from('clients').select('status').eq('id', vehicle.client_id).single();
         if (client?.status === 'active') {
           await createCoverageForVehicle(vehicle.client_id, id);
         }
       }
+      toast.success('Vehicle approved');
       setDrawerOpen(false);
       fetchData();
     } catch (err) {
@@ -153,9 +178,11 @@ export default function PendingApprovals() {
     try {
       const { error } = await supabase.from('vehicles').update({ status: 'rejected', rejection_reason: rejectReason.trim() || null }).eq('id', id);
       if (error) throw error;
+      await writeAuditLog('vehicle_rejected', 'vehicle', id);
       setRejectModalOpen(false);
       setDrawerOpen(false);
       setRejectReason('');
+      toast.success('Vehicle rejected');
       fetchData();
     } catch (err) {
       console.error('Failed to reject vehicle:', err);
@@ -368,9 +395,11 @@ export default function PendingApprovals() {
             <textarea
               className="w-full rounded-md border bg-background px-3 py-2 text-sm min-h-[100px] focus:outline-none focus:ring-2 focus:ring-ring"
               placeholder="Please provide a reason for rejection..."
+              maxLength={500}
               value={rejectReason}
               onChange={e => setRejectReason(e.target.value)}
             />
+            <p className="text-xs text-muted-foreground text-right mt-1">{rejectReason.length}/500</p>
             <div className="flex justify-end gap-2 mt-4">
               <Button variant="outline" onClick={() => setRejectModalOpen(false)}>Cancel</Button>
               <Button

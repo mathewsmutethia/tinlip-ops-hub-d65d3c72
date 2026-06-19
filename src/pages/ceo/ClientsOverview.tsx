@@ -7,14 +7,14 @@ import { Download } from 'lucide-react';
 
 type Client = {
   id: string;
-  name: string;
+  name: string | null;
   email: string | null;
   phone: string | null;
-  status: string;
-  created_at: string;
+  status: string | null;
+  created_at: string | null;
 };
 
-const statuses = ['All', 'active', 'pending', 'dormant', 'rejected'];
+const statuses = ['All', 'active', 'pending_approval', 'dormant', 'rejected'];
 
 export default function ClientsOverview() {
   const [clients, setClients] = useState<Client[]>([]);
@@ -26,8 +26,10 @@ export default function ClientsOverview() {
       .from('clients')
       .select('id, name, email, phone, status, created_at')
       .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        setClients((data as Client[]) ?? []);
+      .limit(500)
+      .then(({ data, error }) => {
+        if (error) console.error('Failed to load clients:', error);
+        else setClients((data as Client[]) ?? []);
         setLoading(false);
       });
   }, []);
@@ -42,8 +44,8 @@ export default function ClientsOverview() {
         c.name ?? '',
         c.email ?? '',
         c.phone ?? '',
-        c.status,
-        new Date(c.created_at).toLocaleDateString('en-KE'),
+        c.status ?? '',
+        c.created_at ? new Date(c.created_at).toLocaleDateString('en-KE') : '',
       ]),
     ];
     const content = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -69,7 +71,7 @@ export default function ClientsOverview() {
             onClick={() => setStatusFilter(s)}
             className={`px-3 py-1.5 text-xs rounded-md font-medium ${statusFilter === s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
           >
-            {s.charAt(0).toUpperCase() + s.slice(1)}
+            {s === 'pending_approval' ? 'Pending' : s.charAt(0).toUpperCase() + s.slice(1)}
           </button>
         ))}
       </div>
@@ -93,12 +95,12 @@ export default function ClientsOverview() {
             <tbody>
               {filtered.map(c => (
                 <tr key={c.id} className="border-b hover:bg-table-hover">
-                  <td className="px-4 py-3 font-medium">{c.name}</td>
+                  <td className="px-4 py-3 font-medium">{c.name ?? '—'}</td>
                   <td className="px-4 py-3 text-muted-foreground">{c.email ?? '—'}</td>
                   <td className="px-4 py-3 font-mono text-xs">{c.phone ?? '—'}</td>
-                  <td className="px-4 py-3"><StatusBadge status={c.status} /></td>
+                  <td className="px-4 py-3"><StatusBadge status={c.status ?? 'unknown'} /></td>
                   <td className="px-4 py-3 text-muted-foreground text-xs">
-                    {new Date(c.created_at).toLocaleDateString('en-KE')}
+                    {c.created_at ? new Date(c.created_at).toLocaleDateString('en-KE') : '—'}
                   </td>
                 </tr>
               ))}

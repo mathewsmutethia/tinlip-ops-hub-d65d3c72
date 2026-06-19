@@ -17,10 +17,12 @@ export default function PaymentsPage() {
   useEffect(() => {
     supabase
       .from('payments')
-      .select('*, clients(name)')
+      .select('id, amount, status, created_at, stk_reference, coverage_start, coverage_end, clients(name)')
       .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        setPayments((data as Payment[]) ?? []);
+      .limit(500)
+      .then(({ data, error }) => {
+        if (error) console.error('Failed to load payments:', error);
+        else setPayments((data as Payment[]) ?? []);
         setLoading(false);
       });
   }, []);

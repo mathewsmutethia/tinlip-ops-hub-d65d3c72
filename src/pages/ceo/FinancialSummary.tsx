@@ -6,9 +6,9 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 type Payment = {
   id: string;
-  amount: number;
-  status: string;
-  created_at: string;
+  amount: number | null;
+  status: string | null;
+  created_at: string | null;
 };
 
 type MonthlyData = {
@@ -25,8 +25,10 @@ export default function FinancialSummary() {
     supabase
       .from('payments')
       .select('id, amount, status, created_at')
-      .then(({ data }) => {
-        setPayments((data as Payment[]) ?? []);
+      .limit(1000)
+      .then(({ data, error }) => {
+        if (error) console.error('Failed to load payments:', error);
+        else setPayments((data as Payment[]) ?? []);
         setLoading(false);
       });
   }, []);
@@ -38,12 +40,15 @@ export default function FinancialSummary() {
 
   const monthlyMap: Record<string, MonthlyData> = {};
   payments.forEach(p => {
+    if (!p.created_at) return;
     const month = p.created_at.slice(0, 7);
     if (!monthlyMap[month]) monthlyMap[month] = { month, confirmed: 0, pending: 0 };
     if (p.status === 'confirmed') monthlyMap[month].confirmed += p.amount ?? 0;
     if (p.status === 'pending') monthlyMap[month].pending += p.amount ?? 0;
   });
-  const chartData = Object.values(monthlyMap).sort((a, b) => a.month.localeCompare(b.month));
+  const chartData = Object.entries(monthlyMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, v]) => v);
 
   return (
     <div>

@@ -4,9 +4,15 @@ import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { StatusBadge } from '@/components/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import type { Tables } from '@/integrations/supabase/types';
+import { toast } from 'sonner';
 
-type Incident = Tables<'incidents'> & {
+type Incident = {
+  id: string;
+  claim_code: string | null;
+  type: string | null;
+  location: string | null;
+  status: string | null;
+  created_at: string | null;
   clients: { name: string | null } | null;
   vehicles: { registration: string } | null;
 };
@@ -21,10 +27,16 @@ export default function IncidentsPage() {
   useEffect(() => {
     supabase
       .from('incidents')
-      .select('*, clients(name), vehicles(registration)')
+      .select('id, claim_code, type, location, status, created_at, clients(name), vehicles(registration)')
       .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        setIncidents((data as Incident[]) ?? []);
+      .limit(500)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Failed to load incidents:', error);
+          toast.error('Failed to load incidents');
+        } else {
+          setIncidents((data as Incident[]) ?? []);
+        }
         setLoading(false);
       });
   }, []);

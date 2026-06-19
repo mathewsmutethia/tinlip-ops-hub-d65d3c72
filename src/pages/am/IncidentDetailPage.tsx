@@ -74,11 +74,17 @@ export default function IncidentDetailPage() {
 
   const fetchIncident = useCallback(async () => {
     if (!id) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('incidents')
       .select('id, claim_code, type, status, description, location, mileage, created_at, notes, feedback_submitted_at, feedback_rating, feedback_timeliness, feedback_professionalism, feedback_comments, feedback_resolved, clients(name, phone), vehicles(registration)')
       .eq('id', id)
       .single();
+    if (error) {
+      console.error('Failed to load incident:', error);
+      setIncident(null);
+      setLoading(false);
+      return;
+    }
     if (!data) {
       setIncident(null);
       setLoading(false);
@@ -91,7 +97,7 @@ export default function IncidentDetailPage() {
     setLoading(false);
   }, [id]);
 
-  useEffect(() => { fetchIncident(); }, [fetchIncident]);
+  useEffect(() => { fetchIncident().catch(console.error); }, [fetchIncident]);
 
   const handleAdvanceStatus = async () => {
     if (!incident?.status) return;
@@ -101,6 +107,13 @@ export default function IncidentDetailPage() {
     try {
       const { error } = await supabase.from('incidents').update({ status: transition.next }).eq('id', incident.id);
       if (error) throw error;
+      const { error: auditErr } = await supabase.from('audit_logs').insert({
+        action: `incident_status_changed_to_${transition.next}`,
+        entity_type: 'incident',
+        entity_id: incident.id,
+        user_id: user?.id ?? null,
+      });
+      if (auditErr) console.error('Audit log write failed:', auditErr);
       await fetchIncident();
     } catch (err) {
       console.error('Failed to advance incident status:', err);
@@ -116,7 +129,7 @@ export default function IncidentDetailPage() {
     try {
       const newNote: PersistedNote = {
         text: noteText.trim(),
-        author: user?.id ?? 'unknown',
+        author: user?.email ?? user?.id ?? 'unknown',
         created_at: new Date().toISOString(),
       };
       const updatedNotes = [...(incident.notes ?? []), newNote];
@@ -283,10 +296,10 @@ export default function IncidentDetailPage() {
             </h3>
             <div className="space-y-3 mb-4 max-h-[240px] overflow-y-auto">
               {persistedNotes.length === 0 && <p className="text-xs text-muted-foreground">No notes yet.</p>}
-              {persistedNotes.map((n) => (
-                <div key={n.created_at + n.author} className="rounded-md bg-muted/50 px-3 py-2.5 text-sm">
+              {persistedNotes.map((n, idx) => (
+                <div key={`${n.author}-${n.created_at}-${idx}`} className="rounded-md bg-muted/50 px-3 py-2.5 text-sm">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium text-xs font-mono">{n.author.length > 16 ? n.author.slice(0, 8) + '…' : n.author}</span>
+                    <span className="font-medium text-xs">{n.author.length > 30 ? n.author.slice(0, 28) + '…' : n.author}</span>
                     <span className="font-mono text-[10px] text-muted-foreground">
                       {new Date(n.created_at).toLocaleString('en-KE')}
                     </span>

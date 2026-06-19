@@ -4,6 +4,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
+import { toast } from 'sonner';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Client = Tables<'clients'>;
@@ -19,10 +20,16 @@ export default function ClientsPage() {
   useEffect(() => {
     supabase
       .from('clients')
-      .select('*')
+      .select('id, name, email, phone, company_name, status, created_at')
       .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        setClients(data ?? []);
+      .limit(500)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Failed to load clients:', error);
+          toast.error('Failed to load clients');
+        } else {
+          setClients(data ?? []);
+        }
         setLoading(false);
       });
   }, []);

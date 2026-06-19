@@ -20,10 +20,12 @@ export default function InvoicesPage() {
   useEffect(() => {
     supabase
       .from('payments')
-      .select('*, clients(name)')
+      .select('id, amount, status, created_at, coverage_start, coverage_end, clients(name)')
       .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        setPayments((data as Payment[]) ?? []);
+      .limit(500)
+      .then(({ data, error }) => {
+        if (error) console.error('Failed to load invoices:', error);
+        else setPayments((data as Payment[]) ?? []);
         setLoading(false);
       });
   }, []);

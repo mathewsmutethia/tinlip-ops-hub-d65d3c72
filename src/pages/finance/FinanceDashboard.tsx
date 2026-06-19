@@ -15,10 +15,12 @@ export default function FinanceDashboard() {
   useEffect(() => {
     supabase
       .from('payments')
-      .select('*, clients(name)')
+      .select('id, amount, status, created_at, stk_reference, clients(name)')
       .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        setPayments((data as Payment[]) ?? []);
+      .limit(1000)
+      .then(({ data, error }) => {
+        if (error) console.error('Failed to load payments:', error);
+        else setPayments((data as Payment[]) ?? []);
         setLoading(false);
       });
   }, []);
@@ -28,15 +30,18 @@ export default function FinanceDashboard() {
   const totalCollected = confirmed.reduce((s, p) => s + (p.amount ?? 0), 0);
   const totalPending = pending.reduce((s, p) => s + (p.amount ?? 0), 0);
 
-  // Build monthly chart data from real payments
   const monthlyMap: Record<string, { month: string; premiums: number }> = {};
   confirmed.forEach(p => {
     if (!p.created_at) return;
-    const month = new Date(p.created_at).toLocaleString('default', { month: 'short' });
-    if (!monthlyMap[month]) monthlyMap[month] = { month, premiums: 0 };
-    monthlyMap[month].premiums += p.amount ?? 0;
+    const key = p.created_at.slice(0, 7);
+    const label = new Date(p.created_at).toLocaleString('default', { month: 'short' });
+    if (!monthlyMap[key]) monthlyMap[key] = { month: label, premiums: 0 };
+    monthlyMap[key].premiums += p.amount ?? 0;
   });
-  const chartData = Object.values(monthlyMap).slice(-6);
+  const chartData = Object.entries(monthlyMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-6)
+    .map(([, v]) => v);
 
   return (
     <div>

@@ -2,8 +2,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { RoleProvider, useRole } from "@/contexts/RoleContext";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { RoleProvider, useRole, type UserRole } from "@/contexts/RoleContext";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import LoginPage from "@/pages/LoginPage";
 import Dashboard from "@/pages/Dashboard";
@@ -28,6 +28,12 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+function ProtectedRoute({ allowedRoles }: { allowedRoles: UserRole[] }) {
+  const { role } = useRole();
+  if (!allowedRoles.includes(role)) return <Navigate to="/dashboard" replace />;
+  return <Outlet />;
+}
+
 function AppRoutes() {
   const { isLoggedIn, loading } = useRole();
 
@@ -47,26 +53,35 @@ function AppRoutes() {
     <Routes>
       <Route element={<DashboardLayout />}>
         <Route path="/dashboard" element={<Dashboard />} />
+
         {/* Account Manager */}
-        <Route path="/approvals" element={<PendingApprovals />} />
-        <Route path="/clients" element={<ClientsPage />} />
-        <Route path="/vehicles" element={<VehiclesPage />} />
-        <Route path="/incidents" element={<IncidentsPage />} />
-        <Route path="/incidents/:id" element={<IncidentDetailPage />} />
-        <Route path="/providers" element={<ServiceProvidersPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
+        <Route element={<ProtectedRoute allowedRoles={['account_manager']} />}>
+          <Route path="/approvals" element={<PendingApprovals />} />
+          <Route path="/clients" element={<ClientsPage />} />
+          <Route path="/vehicles" element={<VehiclesPage />} />
+          <Route path="/incidents" element={<IncidentsPage />} />
+          <Route path="/incidents/:id" element={<IncidentDetailPage />} />
+          <Route path="/providers" element={<ServiceProvidersPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+        </Route>
+
         {/* Finance */}
-        <Route path="/invoices" element={<InvoicesPage />} />
-        <Route path="/payments" element={<PaymentsPage />} />
-        <Route path="/claims" element={<ClaimsPayoutsPage />} />
-        <Route path="/reconciliation" element={<ReconciliationPage />} />
-        <Route path="/reports" element={<ReportsPage />} />
+        <Route element={<ProtectedRoute allowedRoles={['finance']} />}>
+          <Route path="/invoices" element={<InvoicesPage />} />
+          <Route path="/payments" element={<PaymentsPage />} />
+          <Route path="/claims" element={<ClaimsPayoutsPage />} />
+          <Route path="/reconciliation" element={<ReconciliationPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
+        </Route>
+
         {/* CEO */}
-        <Route path="/clients-overview" element={<ClientsOverview />} />
-        <Route path="/incidents-overview" element={<IncidentsOverview />} />
-        <Route path="/financial-summary" element={<FinancialSummary />} />
-        <Route path="/audit-logs" element={<AuditLogsPage />} />
-        <Route path="/export-reports" element={<ExportReportsPage />} />
+        <Route element={<ProtectedRoute allowedRoles={['ceo']} />}>
+          <Route path="/clients-overview" element={<ClientsOverview />} />
+          <Route path="/incidents-overview" element={<IncidentsOverview />} />
+          <Route path="/financial-summary" element={<FinancialSummary />} />
+          <Route path="/audit-logs" element={<AuditLogsPage />} />
+          <Route path="/export-reports" element={<ExportReportsPage />} />
+        </Route>
       </Route>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<NotFound />} />

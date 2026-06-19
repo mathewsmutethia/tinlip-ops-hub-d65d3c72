@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { StatusBadge } from '@/components/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Vehicle = Tables<'vehicles'> & { clients: { name: string | null } | null };
@@ -13,10 +14,16 @@ export default function VehiclesPage() {
   useEffect(() => {
     supabase
       .from('vehicles')
-      .select('*, clients(name)')
+      .select('id, registration, make, model, year, mileage, status, clients(name)')
       .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        setVehicles((data as Vehicle[]) ?? []);
+      .limit(500)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Failed to load vehicles:', error);
+          toast.error('Failed to load vehicles');
+        } else {
+          setVehicles((data as Vehicle[]) ?? []);
+        }
         setLoading(false);
       });
   }, []);

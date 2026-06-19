@@ -1,13 +1,14 @@
 import { useRole, UserRole } from '@/contexts/RoleContext';
-import { useLocation, useNavigate, Link } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import {
   LayoutDashboard, ClipboardCheck, Users, Car, AlertTriangle, Wrench, Settings,
   FileText, CreditCard, Receipt, ArrowLeftRight, BarChart3, Eye, Shield,
-  ScrollText, Download, LogOut, ChevronDown, ChevronLeft, ChevronRight
+  ScrollText, Download, LogOut, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { supabase } from '@/integrations/supabase/client';
 
 const roleLabels: Record<UserRole, string> = {
   account_manager: 'Account Manager',
@@ -19,13 +20,13 @@ interface NavItem {
   label: string;
   path: string;
   icon: React.ElementType;
-  badge?: number;
+  showPendingBadge?: boolean;
 }
 
 const navItems: Record<UserRole, NavItem[]> = {
   account_manager: [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { label: 'Pending Approvals', path: '/approvals', icon: ClipboardCheck, badge: 20 },
+    { label: 'Pending Approvals', path: '/approvals', icon: ClipboardCheck, showPendingBadge: true },
     { label: 'Clients', path: '/clients', icon: Users },
     { label: 'Vehicles', path: '/vehicles', icon: Car },
     { label: 'Incidents', path: '/incidents', icon: AlertTriangle },
@@ -51,17 +52,21 @@ const navItems: Record<UserRole, NavItem[]> = {
 };
 
 export function AppSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
-  const { role, setRole, signOut } = useRole();
+  const { role, signOut } = useRole();
   const location = useLocation();
-  const navigate = useNavigate();
-  const [roleSwitcherOpen, setRoleSwitcherOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
   const items = navItems[role];
 
-  const handleRoleChange = (newRole: UserRole) => {
-    setRole(newRole);
-    setRoleSwitcherOpen(false);
-    navigate('/dashboard');
-  };
+  useEffect(() => {
+    if (role !== 'account_manager') return;
+    supabase
+      .from('clients')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending_approval')
+      .then(({ count, error }) => {
+        if (!error) setPendingCount(count ?? 0);
+      });
+  }, [role]);
 
   const width = collapsed ? 'w-[56px]' : 'w-52';
 
@@ -81,39 +86,12 @@ export function AppSidebar({ collapsed, onToggle }: { collapsed: boolean; onTogg
         )}
       </div>
 
-      {/* Role Switcher */}
-      {!collapsed && (
-        <div className="relative border-b border-sidebar-border px-2 py-1.5">
-          <button
-            onClick={() => setRoleSwitcherOpen(!roleSwitcherOpen)}
-            className="flex w-full items-center justify-between rounded px-2 py-1 text-[11px] text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          >
-            <span>Switch Role</span>
-            <ChevronDown className="h-3 w-3" />
-          </button>
-          {roleSwitcherOpen && (
-            <div className="absolute left-2 right-2 top-full z-50 mt-0.5 rounded border border-sidebar-border bg-sidebar shadow-lg">
-              {(Object.keys(roleLabels) as UserRole[]).map(r => (
-                <button
-                  key={r}
-                  onClick={() => handleRoleChange(r)}
-                  className={cn(
-                    'flex w-full items-center px-3 py-1.5 text-[11px] hover:bg-sidebar-accent',
-                    r === role && 'text-sidebar-primary font-medium'
-                  )}
-                >
-                  {roleLabels[r]}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
         {items.map(item => {
           const active = location.pathname === item.path;
+          const badge = item.showPendingBadge ? pendingCount : 0;
+
           const linkContent = (
             <Link
               key={item.path}
@@ -129,12 +107,12 @@ export function AppSidebar({ collapsed, onToggle }: { collapsed: boolean; onTogg
             >
               <item.icon className="h-4 w-4 shrink-0" />
               {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
-              {!collapsed && item.badge && (
+              {!collapsed && badge > 0 && (
                 <span className="rounded-full bg-sidebar-primary px-1.5 py-0.5 text-[9px] font-semibold text-sidebar-primary-foreground leading-none">
-                  {item.badge}
+                  {badge}
                 </span>
               )}
-              {collapsed && item.badge && (
+              {collapsed && badge > 0 && (
                 <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-sidebar-primary" />
               )}
             </Link>
@@ -148,7 +126,7 @@ export function AppSidebar({ collapsed, onToggle }: { collapsed: boolean; onTogg
                 </TooltipTrigger>
                 <TooltipContent side="right" className="text-xs">
                   {item.label}
-                  {item.badge ? ` (${item.badge})` : ''}
+                  {badge > 0 ? ` (${badge})` : ''}
                 </TooltipContent>
               </Tooltip>
             );

@@ -19,14 +19,17 @@ export default function AMDashboard() {
   useEffect(() => {
     Promise.all([
       supabase.from('clients').select('*', { count: 'exact', head: true }).eq('status', 'pending_approval'),
-      supabase.from('incidents').select('*', { count: 'exact', head: true }).eq('status', 'open'),
+      supabase.from('incidents').select('*', { count: 'exact', head: true }).in('status', ['open', 'in_progress', 'service_assigned']),
       supabase.from('clients').select('*', { count: 'exact', head: true }),
-      supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(8),
+      supabase.from('audit_logs').select('id, action, entity_type, entity_id, created_at').order('created_at', { ascending: false }).limit(8),
     ]).then(([pending, activeInc, total, logs]) => {
-      setPendingClientsCount(pending.count ?? 0);
-      setActiveIncidentsCount(activeInc.count ?? 0);
-      setTotalClientsCount(total.count ?? 0);
-      setRecentLogs(logs.data ?? []);
+      if (!pending.error) setPendingClientsCount(pending.count ?? 0);
+      if (!activeInc.error) setActiveIncidentsCount(activeInc.count ?? 0);
+      if (!total.error) setTotalClientsCount(total.count ?? 0);
+      if (!logs.error) setRecentLogs(logs.data ?? []);
+      setLoading(false);
+    }).catch(err => {
+      console.error('Dashboard load failed:', err);
       setLoading(false);
     });
   }, []);

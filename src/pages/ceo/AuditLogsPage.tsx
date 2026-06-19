@@ -6,11 +6,11 @@ import { Download } from 'lucide-react';
 
 type AuditLog = {
   id: string;
-  action: string;
+  action: string | null;
   entity_type: string | null;
   entity_id: string | null;
   user_id: string | null;
-  created_at: string;
+  created_at: string | null;
 };
 
 export default function AuditLogsPage() {
@@ -23,8 +23,9 @@ export default function AuditLogsPage() {
       .select('id, action, entity_type, entity_id, user_id, created_at')
       .order('created_at', { ascending: false })
       .limit(500)
-      .then(({ data }) => {
-        setLogs((data as AuditLog[]) ?? []);
+      .then(({ data, error }) => {
+        if (error) console.error('Failed to load audit logs:', error);
+        else setLogs((data as AuditLog[]) ?? []);
         setLoading(false);
       });
   }, []);
@@ -34,8 +35,8 @@ export default function AuditLogsPage() {
     const rows = [
       ['Timestamp', 'Action', 'Entity Type', 'Entity ID', 'User ID'],
       ...logs.map(l => [
-        new Date(l.created_at).toLocaleString('en-KE'),
-        l.action,
+        l.created_at ? new Date(l.created_at).toLocaleString('en-KE') : '',
+        l.action ?? '',
         l.entity_type ?? '',
         l.entity_id ?? '',
         l.user_id ?? '',
@@ -77,12 +78,12 @@ export default function AuditLogsPage() {
               {logs.map(l => (
                 <tr key={l.id} className="border-b hover:bg-table-hover">
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                    {new Date(l.created_at).toLocaleString('en-KE')}
+                    {l.created_at ? new Date(l.created_at).toLocaleString('en-KE') : '—'}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs">
                     {l.user_id ? l.user_id.slice(0, 8) + '…' : '—'}
                   </td>
-                  <td className="px-4 py-3 font-medium">{l.action}</td>
+                  <td className="px-4 py-3 font-medium">{l.action ?? '—'}</td>
                   <td className="px-4 py-3 text-muted-foreground">{l.entity_type ?? '—'}</td>
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
                     {l.entity_id ? l.entity_id.slice(0, 8) + '…' : '—'}

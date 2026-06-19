@@ -5,11 +5,11 @@ import { supabase } from '@/integrations/supabase/client';
 
 type Incident = {
   id: string;
-  claim_code: string;
-  type: string;
-  status: string;
-  created_at: string;
-  clients: { name: string } | null;
+  claim_code: string | null;
+  type: string | null;
+  status: string | null;
+  created_at: string | null;
+  clients: { name: string | null } | null;
   vehicles: { registration: string } | null;
 };
 
@@ -22,8 +22,10 @@ export default function ClaimsPayoutsPage() {
       .from('incidents')
       .select('id, claim_code, type, status, created_at, clients(name), vehicles(registration)')
       .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        setIncidents((data as Incident[]) ?? []);
+      .limit(500)
+      .then(({ data, error }) => {
+        if (error) console.error('Failed to load claims:', error);
+        else setIncidents((data as Incident[]) ?? []);
         setLoading(false);
       });
   }, []);
@@ -53,13 +55,13 @@ export default function ClaimsPayoutsPage() {
             <tbody>
               {incidents.map(c => (
                 <tr key={c.id} className="border-b hover:bg-table-hover">
-                  <td className="px-4 py-3 font-mono font-medium text-primary">{c.claim_code}</td>
-                  <td className="px-4 py-3">{c.type}</td>
+                  <td className="px-4 py-3 font-mono font-medium text-primary">{c.claim_code ?? c.id.slice(0, 8)}</td>
+                  <td className="px-4 py-3">{c.type ?? '—'}</td>
                   <td className="px-4 py-3">{c.clients?.name ?? '—'}</td>
                   <td className="px-4 py-3 font-mono">{c.vehicles?.registration ?? '—'}</td>
-                  <td className="px-4 py-3"><StatusBadge status={c.status} /></td>
+                  <td className="px-4 py-3"><StatusBadge status={c.status ?? 'unknown'} /></td>
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                    {new Date(c.created_at).toLocaleDateString('en-KE')}
+                    {c.created_at ? new Date(c.created_at).toLocaleDateString('en-KE') : '—'}
                   </td>
                 </tr>
               ))}

@@ -6,10 +6,10 @@ import { cn } from '@/lib/utils';
 
 type Incident = {
   id: string;
-  claim_code: string;
-  type: string;
-  status: string;
-  created_at: string;
+  claim_code: string | null;
+  type: string | null;
+  status: string | null;
+  created_at: string | null;
   clients: { name: string | null } | null;
   vehicles: { registration: string } | null;
 };
@@ -26,8 +26,10 @@ export default function IncidentsOverview() {
       .from('incidents')
       .select('id, claim_code, type, status, created_at, clients(name), vehicles(registration)')
       .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        setIncidents((data as Incident[]) ?? []);
+      .limit(500)
+      .then(({ data, error }) => {
+        if (error) console.error('Failed to load incidents:', error);
+        else setIncidents((data as Incident[]) ?? []);
         setLoading(false);
       });
   }, []);
@@ -71,13 +73,13 @@ export default function IncidentsOverview() {
             <tbody>
               {filtered.map(i => (
                 <tr key={i.id} className="border-b hover:bg-table-hover">
-                  <td className="px-4 py-3 font-mono font-medium">{i.claim_code}</td>
+                  <td className="px-4 py-3 font-mono font-medium">{i.claim_code ?? i.id.slice(0, 8)}</td>
                   <td className="px-4 py-3">{i.clients?.name ?? '—'}</td>
                   <td className="px-4 py-3 font-mono">{i.vehicles?.registration ?? '—'}</td>
-                  <td className="px-4 py-3">{i.type}</td>
-                  <td className="px-4 py-3"><StatusBadge status={i.status} /></td>
+                  <td className="px-4 py-3">{i.type ?? '—'}</td>
+                  <td className="px-4 py-3"><StatusBadge status={i.status ?? 'unknown'} /></td>
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                    {new Date(i.created_at).toLocaleDateString('en-KE')}
+                    {i.created_at ? new Date(i.created_at).toLocaleDateString('en-KE') : '—'}
                   </td>
                 </tr>
               ))}
