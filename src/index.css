@@ -6,28 +6,28 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
+    --background: 0 0% 100%;
+    --foreground: 240 5% 3%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card: 300 9% 95%;
+    --card-foreground: 240 5% 3%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 240 5% 3%;
 
-    --primary: 38 78% 52%;
+    --primary: 234 56% 60%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 300 9% 95%;
+    --secondary-foreground: 240 5% 3%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 300 9% 95%;
+    --muted-foreground: 218 10% 59%;
 
-    --accent: 38 78% 52%;
+    --accent: 234 56% 60%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 79% 63%;
     --destructive-foreground: 0 0% 100%;
 
     --success: 142 72% 29%;
@@ -36,23 +36,23 @@
     --warning: 32 95% 44%;
     --warning-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 38 78% 52%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 234 100% 75%;
 
     --radius: 0.5rem;
 
     --sidebar-background: 222 47% 11%;
     --sidebar-foreground: 210 40% 80%;
-    --sidebar-primary: 38 78% 52%;
+    --sidebar-primary: 234 56% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 217 33% 17%;
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 217 33% 17%;
-    --sidebar-ring: 38 78% 52%;
+    --sidebar-ring: 234 100% 75%;
     --sidebar-muted: 215 16% 47%;
 
-    --table-hover: 210 40% 97%;
+    --table-hover: 300 9% 97%;
   }
 }
 
@@ -70,4 +70,53 @@
   .font-mono-data {
     font-family: 'JetBrains Mono', monospace;
   }
+}
+
+/* vaul drawer styles — inlined because vaul package.json exports map omits style.css */
+[data-vaul-drawer] {
+  touch-action: none;
+  will-change: transform;
+  transition: transform 0.5s cubic-bezier(0.32, 0.72, 0, 1);
+  animation-duration: 0.5s;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+}
+[data-vaul-drawer][data-vaul-snap-points='false'][data-vaul-drawer-direction='right'][data-state='open'] {
+  animation-name: vaulSlideFromRight;
+}
+[data-vaul-drawer][data-vaul-snap-points='false'][data-vaul-drawer-direction='right'][data-state='closed'] {
+  animation-name: vaulSlideToRight;
+}
+[data-vaul-overlay][data-vaul-snap-points='false'] {
+  animation-duration: 0.5s;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+}
+[data-vaul-overlay][data-vaul-snap-points='false'][data-state='open'] {
+  animation-name: vaulFadeIn;
+}
+[data-vaul-overlay][data-state='closed'] {
+  animation-name: vaulFadeOut;
+}
+[data-vaul-drawer][data-vaul-drawer-direction='right']::after {
+  content: '';
+  position: absolute;
+  left: 100%;
+  right: initial;
+  top: 0;
+  bottom: 0;
+  width: 200%;
+  background: inherit;
+}
+@keyframes vaulFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes vaulFadeOut {
+  to { opacity: 0; }
+}
+@keyframes vaulSlideFromRight {
+  from { transform: translate3d(100%, 0, 0); }
+  to   { transform: translate3d(0, 0, 0); }
+}
+@keyframes vaulSlideToRight {
+  to { transform: translate3d(100%, 0, 0); }
 }

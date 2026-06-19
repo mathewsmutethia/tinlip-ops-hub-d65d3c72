@@ -18,7 +18,7 @@ export default function AMDashboard() {
 
   useEffect(() => {
     Promise.all([
-      supabase.from('clients').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+      supabase.from('clients').select('*', { count: 'exact', head: true }).eq('status', 'pending_approval'),
       supabase.from('incidents').select('*', { count: 'exact', head: true }).eq('status', 'open'),
       supabase.from('clients').select('*', { count: 'exact', head: true }),
       supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(8),

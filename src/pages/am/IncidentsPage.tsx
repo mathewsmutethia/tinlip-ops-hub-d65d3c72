@@ -11,7 +11,7 @@ type Incident = Tables<'incidents'> & {
   vehicles: { registration: string } | null;
 };
 
-const statuses = ['All', 'open', 'in_progress', 'completed', 'closed'];
+const statuses = ['All', 'open', 'in_progress', 'service_assigned', 'completed', 'closed'];
 
 export default function IncidentsPage() {
   const [incidents, setIncidents] = useState<Incident[]>([]);

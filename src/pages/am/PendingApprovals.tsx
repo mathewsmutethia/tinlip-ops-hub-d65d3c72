@@ -5,20 +5,24 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { X, Check, Eye, ExternalLink, Loader2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
+import { Drawer } from 'vaul';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Client = Tables<'clients'>;
 type Vehicle = Tables<'vehicles'> & { clients: { name: string | null } | null };
 
+function isClientItem(item: Client | Vehicle): item is Client {
+  return 'email' in item;
+}
+
 export default function PendingApprovals() {
-  const { toast } = useToast();
   const [tab, setTab] = useState<'clients' | 'vehicles'>('clients');
   const [pendingClients, setPendingClients] = useState<Client[]>([]);
   const [pendingVehicles, setPendingVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
-  const [slideOverOpen, setSlideOverOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<Client | Vehicle | null>(null);
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
@@ -28,7 +32,7 @@ export default function PendingApprovals() {
   const fetchData = () => {
     setLoading(true);
     Promise.all([
-      supabase.from('clients').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
+      supabase.from('clients').select('*').eq('status', 'pending_approval').order('created_at', { ascending: false }),
       supabase.from('vehicles').select('*, clients(name)').eq('status', 'pending').order('created_at', { ascending: false }),
     ]).then(([clientsRes, vehiclesRes]) => {
       if (clientsRes.error) throw clientsRes.error;
@@ -38,20 +42,19 @@ export default function PendingApprovals() {
       setLoading(false);
     }).catch(err => {
       console.error('Failed to load pending approvals:', err);
-      toast({ title: 'Failed to load data', description: 'Please refresh and try again.', variant: 'destructive' });
+      toast.error('Failed to load data', { description: 'Please refresh and try again.' });
       setLoading(false);
     });
   };
 
   useEffect(() => { fetchData(); }, []);
 
-  const openReview = async (item: any) => {
+  const openReview = async (item: Client | Vehicle) => {
     setSelectedItem(item);
     setDocUrls({});
-    setSlideOverOpen(true);
+    setDrawerOpen(true);
 
-    const isClientItem = 'email' in item;
-    const paths: [string, string][] = isClientItem
+    const paths: [string, string][] = isClientItem(item)
       ? item.id_document_url ? [['id', item.id_document_url]] : []
       : [
           ...(item.logbook_url ? [['logbook', item.logbook_url] as [string, string]] : []),
@@ -77,13 +80,14 @@ export default function PendingApprovals() {
     const today = new Date();
     const endDate = new Date(today);
     endDate.setFullYear(endDate.getFullYear() + 1);
-    await supabase.from('coverage').insert({
+    const { error } = await supabase.from('coverage').insert({
       client_id: clientId,
       vehicle_id: vehicleId,
       status: 'active',
       start_date: today.toISOString().split('T')[0],
       end_date: endDate.toISOString().split('T')[0],
     });
+    if (error) throw error;
   };
 
   const approveClient = async (id: string) => {
@@ -91,15 +95,15 @@ export default function PendingApprovals() {
     try {
       const { error } = await supabase.from('clients').update({ status: 'active' }).eq('id', id);
       if (error) throw error;
-      const { data: clientVehicles } = await supabase.from('vehicles').select('id').eq('client_id', id);
+      const { data: clientVehicles } = await supabase.from('vehicles').select('id').eq('client_id', id).eq('status', 'active');
       if (clientVehicles && clientVehicles.length > 0) {
         await Promise.all(clientVehicles.map(v => createCoverageForVehicle(id, v.id)));
       }
-      setSlideOverOpen(false);
+      setDrawerOpen(false);
       fetchData();
     } catch (err) {
       console.error('Failed to approve client:', err);
-      toast({ title: 'Failed to approve client', variant: 'destructive' });
+      toast.error('Failed to approve client');
     } finally {
       setActionLoading(false);
     }
@@ -111,12 +115,12 @@ export default function PendingApprovals() {
       const { error } = await supabase.from('clients').update({ status: 'rejected', rejection_reason: rejectReason.trim() || null }).eq('id', id);
       if (error) throw error;
       setRejectModalOpen(false);
-      setSlideOverOpen(false);
+      setDrawerOpen(false);
       setRejectReason('');
       fetchData();
     } catch (err) {
       console.error('Failed to reject client:', err);
-      toast({ title: 'Failed to reject client', variant: 'destructive' });
+      toast.error('Failed to reject client');
     } finally {
       setActionLoading(false);
     }
@@ -134,11 +138,11 @@ export default function PendingApprovals() {
           await createCoverageForVehicle(vehicle.client_id, id);
         }
       }
-      setSlideOverOpen(false);
+      setDrawerOpen(false);
       fetchData();
     } catch (err) {
       console.error('Failed to approve vehicle:', err);
-      toast({ title: 'Failed to approve vehicle', variant: 'destructive' });
+      toast.error('Failed to approve vehicle');
     } finally {
       setActionLoading(false);
     }
@@ -150,18 +154,16 @@ export default function PendingApprovals() {
       const { error } = await supabase.from('vehicles').update({ status: 'rejected', rejection_reason: rejectReason.trim() || null }).eq('id', id);
       if (error) throw error;
       setRejectModalOpen(false);
-      setSlideOverOpen(false);
+      setDrawerOpen(false);
       setRejectReason('');
       fetchData();
     } catch (err) {
       console.error('Failed to reject vehicle:', err);
-      toast({ title: 'Failed to reject vehicle', variant: 'destructive' });
+      toast.error('Failed to reject vehicle');
     } finally {
       setActionLoading(false);
     }
   };
-
-  const isClient = selectedItem && 'email' in selectedItem;
 
   return (
     <div>
@@ -169,10 +171,16 @@ export default function PendingApprovals() {
       <h1 className="text-xl font-semibold mb-5">Pending Approvals</h1>
 
       <div className="flex gap-1 mb-4 border-b">
-        <button onClick={() => setTab('clients')} className={cn('px-4 py-2 text-sm font-medium border-b-2 -mb-px', tab === 'clients' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
+        <button
+          onClick={() => setTab('clients')}
+          className={cn('px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors', tab === 'clients' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}
+        >
           Clients ({pendingClients.length})
         </button>
-        <button onClick={() => setTab('vehicles')} className={cn('px-4 py-2 text-sm font-medium border-b-2 -mb-px', tab === 'vehicles' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
+        <button
+          onClick={() => setTab('vehicles')}
+          className={cn('px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors', tab === 'vehicles' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}
+        >
           Vehicles ({pendingVehicles.length})
         </button>
       </div>
@@ -203,9 +211,11 @@ export default function PendingApprovals() {
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">Loading...</td></tr>}
+            {loading && (
+              <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">Loading...</td></tr>
+            )}
             {!loading && tab === 'clients' && pendingClients.map(c => (
-              <tr key={c.id} className="border-b hover:bg-table-hover">
+              <tr key={c.id} className="border-b hover:bg-table-hover transition-colors">
                 <td className="px-4 py-3 font-medium">{c.name ?? '—'}</td>
                 <td className="px-4 py-3 text-muted-foreground">{c.email}</td>
                 <td className="px-4 py-3 font-mono text-xs">{c.phone ?? '—'}</td>
@@ -219,7 +229,7 @@ export default function PendingApprovals() {
               </tr>
             ))}
             {!loading && tab === 'vehicles' && pendingVehicles.map(v => (
-              <tr key={v.id} className="border-b hover:bg-table-hover">
+              <tr key={v.id} className="border-b hover:bg-table-hover transition-colors">
                 <td className="px-4 py-3 font-mono font-medium">{v.registration}</td>
                 <td className="px-4 py-3">{v.make ?? '—'} {v.model ?? ''}</td>
                 <td className="px-4 py-3 font-mono">{v.year ?? '—'}</td>
@@ -242,92 +252,117 @@ export default function PendingApprovals() {
         </table>
       </div>
 
-      {/* Slide-over Panel */}
-      {slideOverOpen && selectedItem && (
-        <>
-          <div className="fixed inset-0 z-40 bg-foreground/20 backdrop-blur-sm" onClick={() => setSlideOverOpen(false)} />
-          <div className="fixed right-0 top-0 z-50 h-full w-[480px] bg-card border-l shadow-xl flex flex-col">
-            <div className="flex items-center justify-between border-b px-6 py-4">
-              <h2 className="text-base font-semibold">Review {selectedItem.name || selectedItem.registration}</h2>
-              <button onClick={() => setSlideOverOpen(false)}><X className="h-5 w-5 text-muted-foreground" /></button>
-            </div>
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 text-sm">
-              {isClient ? (
-                <div className="space-y-3">
-                  <h3 className="font-semibold">Client Profile</h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div><span className="text-muted-foreground">Name:</span> <span className="font-medium">{selectedItem.name ?? '—'}</span></div>
-                    <div><span className="text-muted-foreground">Email:</span> {selectedItem.email}</div>
-                    <div><span className="text-muted-foreground">Phone:</span> {selectedItem.phone ?? '—'}</div>
-                    <div><span className="text-muted-foreground">ID No:</span> {selectedItem.id_number ?? '—'}</div>
-                    <div><span className="text-muted-foreground">Company:</span> {selectedItem.company_name ?? '—'}</div>
-                    <div><span className="text-muted-foreground">Address:</span> {selectedItem.address ?? '—'}</div>
-                  </div>
-                  <div className="rounded-md border p-3 bg-muted/50">
-                    <p className="text-xs text-muted-foreground mb-1">ID Document</p>
-                    {loadingDocs ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-                    ) : docUrls['id'] ? (
-                      <a href={docUrls['id']} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-primary font-medium">
-                        View <ExternalLink className="h-3 w-3" />
-                      </a>
-                    ) : selectedItem.id_document_url ? (
-                      <span className="text-xs text-destructive">URL expired — refresh to retry</span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">Not uploaded</span>
-                    )}
-                  </div>
+      {/* Vaul Drawer — replaces custom slide-over */}
+      <Drawer.Root
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        direction="right"
+        shouldScaleBackground={false}
+        noBodyStyles
+      >
+        <Drawer.Portal>
+          <Drawer.Overlay className="fixed inset-0 z-40 bg-foreground/20" />
+          <Drawer.Content className="fixed right-0 top-0 z-50 h-full w-[480px] bg-card border-l shadow-xl flex flex-col outline-none">
+            {selectedItem && (
+              <>
+                <div className="flex items-center justify-between border-b px-6 py-4">
+                  <Drawer.Title className="text-base font-semibold">
+                    Review {isClientItem(selectedItem) ? (selectedItem.name ?? 'Client') : selectedItem.registration}
+                  </Drawer.Title>
+                  <button
+                    onClick={() => setDrawerOpen(false)}
+                    className="rounded-md p-1 text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label="Close"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  <h3 className="font-semibold">Vehicle Details</h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div><span className="text-muted-foreground">Registration:</span> <span className="font-mono font-medium">{selectedItem.registration}</span></div>
-                    <div><span className="text-muted-foreground">Make/Model:</span> {selectedItem.make ?? '—'} {selectedItem.model ?? ''}</div>
-                    <div><span className="text-muted-foreground">Year:</span> {selectedItem.year ?? '—'}</div>
-                    <div><span className="text-muted-foreground">Engine No:</span> <span className="font-mono text-xs">{selectedItem.engine_number ?? '—'}</span></div>
-                    <div><span className="text-muted-foreground">Chassis No:</span> <span className="font-mono text-xs">{selectedItem.chassis_number ?? '—'}</span></div>
-                    <div><span className="text-muted-foreground">Mileage:</span> <span className="font-mono">{selectedItem.mileage != null ? `${selectedItem.mileage.toLocaleString()} km` : '—'}</span></div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(['logbook', 'insurance'] as const).map((key) => (
-                      <div key={key} className="rounded-md border p-3 bg-muted/50">
-                        <p className="text-xs text-muted-foreground mb-1 capitalize">{key}</p>
+
+                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 text-sm">
+                  {isClientItem(selectedItem) ? (
+                    <div className="space-y-3">
+                      <h3 className="font-semibold">Client Profile</h3>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div><span className="text-muted-foreground">Name:</span> <span className="font-medium">{selectedItem.name ?? '—'}</span></div>
+                        <div><span className="text-muted-foreground">Email:</span> {selectedItem.email}</div>
+                        <div><span className="text-muted-foreground">Phone:</span> {selectedItem.phone ?? '—'}</div>
+                        <div><span className="text-muted-foreground">ID No:</span> {selectedItem.id_number ?? '—'}</div>
+                        <div><span className="text-muted-foreground">Company:</span> {selectedItem.company_name ?? '—'}</div>
+                        <div><span className="text-muted-foreground">Address:</span> {selectedItem.address ?? '—'}</div>
+                      </div>
+                      <div className="rounded-md border p-3 bg-muted/50">
+                        <p className="text-xs text-muted-foreground mb-1">ID Document</p>
                         {loadingDocs ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-                        ) : docUrls[key] ? (
-                          <a href={docUrls[key]!} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-primary font-medium">
+                        ) : docUrls['id'] ? (
+                          <a href={docUrls['id']} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-primary font-medium">
                             View <ExternalLink className="h-3 w-3" />
                           </a>
+                        ) : selectedItem.id_document_url ? (
+                          <span className="text-xs text-destructive">URL expired — refresh to retry</span>
                         ) : (
                           <span className="text-xs text-muted-foreground">Not uploaded</span>
                         )}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <h3 className="font-semibold">Vehicle Details</h3>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div><span className="text-muted-foreground">Registration:</span> <span className="font-mono font-medium">{selectedItem.registration}</span></div>
+                        <div><span className="text-muted-foreground">Make/Model:</span> {selectedItem.make ?? '—'} {selectedItem.model ?? ''}</div>
+                        <div><span className="text-muted-foreground">Year:</span> {selectedItem.year ?? '—'}</div>
+                        <div><span className="text-muted-foreground">Engine No:</span> <span className="font-mono text-xs">{selectedItem.engine_number ?? '—'}</span></div>
+                        <div><span className="text-muted-foreground">Chassis No:</span> <span className="font-mono text-xs">{selectedItem.chassis_number ?? '—'}</span></div>
+                        <div><span className="text-muted-foreground">Mileage:</span> <span className="font-mono">{selectedItem.mileage != null ? `${selectedItem.mileage.toLocaleString()} km` : '—'}</span></div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(['logbook', 'insurance'] as const).map((key) => (
+                          <div key={key} className="rounded-md border p-3 bg-muted/50">
+                            <p className="text-xs text-muted-foreground mb-1 capitalize">{key}</p>
+                            {loadingDocs ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                            ) : docUrls[key] ? (
+                              <a href={docUrls[key]!} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-primary font-medium">
+                                View <ExternalLink className="h-3 w-3" />
+                              </a>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Not uploaded</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-            <div className="border-t px-6 py-4 flex gap-3">
-              <Button
-                className="flex-1 bg-success hover:bg-success/90 text-success-foreground"
-                disabled={actionLoading}
-                onClick={() => isClient ? approveClient(selectedItem.id) : approveVehicle(selectedItem.id)}
-              >
-                <Check className="h-4 w-4 mr-1" /> {actionLoading ? 'Processing...' : 'Approve'}
-              </Button>
-              <Button variant="destructive" className="flex-1" disabled={actionLoading} onClick={() => setRejectModalOpen(true)}>
-                <X className="h-4 w-4 mr-1" /> Reject
-              </Button>
-            </div>
-          </div>
-        </>
-      )}
+
+                <div className="border-t px-6 py-4 flex gap-3">
+                  <Button
+                    className="flex-1 bg-success hover:bg-success/90 text-success-foreground"
+                    disabled={actionLoading}
+                    onClick={() => isClientItem(selectedItem) ? approveClient(selectedItem.id) : approveVehicle(selectedItem.id)}
+                  >
+                    <Check className="h-4 w-4 mr-1" /> {actionLoading ? 'Processing...' : 'Approve'}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    className="flex-1"
+                    disabled={actionLoading}
+                    onClick={() => setRejectModalOpen(true)}
+                  >
+                    <X className="h-4 w-4 mr-1" /> Reject
+                  </Button>
+                </div>
+              </>
+            )}
+          </Drawer.Content>
+        </Drawer.Portal>
+      </Drawer.Root>
 
       {/* Reject Modal */}
-      {rejectModalOpen && (
+      {rejectModalOpen && selectedItem && (
         <>
-          <div className="fixed inset-0 z-[60] bg-foreground/20 backdrop-blur-sm" onClick={() => setRejectModalOpen(false)} />
+          <div className="fixed inset-0 z-[60] bg-foreground/20" onClick={() => setRejectModalOpen(false)} />
           <div className="fixed left-1/2 top-1/2 z-[70] w-full max-w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-card p-6 shadow-xl">
             <h3 className="text-base font-semibold mb-3">Rejection Reason</h3>
             <textarea
@@ -341,7 +376,7 @@ export default function PendingApprovals() {
               <Button
                 variant="destructive"
                 disabled={!rejectReason.trim() || actionLoading}
-                onClick={() => isClient ? rejectClient(selectedItem.id) : rejectVehicle(selectedItem.id)}
+                onClick={() => isClientItem(selectedItem) ? rejectClient(selectedItem.id) : rejectVehicle(selectedItem.id)}
               >
                 Confirm Rejection
               </Button>

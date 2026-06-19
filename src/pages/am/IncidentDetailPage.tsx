@@ -1,15 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { StatusBadge } from '@/components/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { useRole } from '@/contexts/RoleContext';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
   ArrowLeft, Phone, MapPin, Car, User, Clock, MessageSquare, Send,
-  CheckCircle2, Circle, AlertTriangle, Wrench, ShieldCheck
+  CheckCircle2, Circle, AlertTriangle, Wrench, ShieldCheck, Gauge, Star
 } from 'lucide-react';
 
 const timelineSteps = [
@@ -33,42 +33,68 @@ type PersistedNote = { text: string; author: string; created_at: string };
 
 type Incident = {
   id: string;
-  claim_code: string;
-  type: string;
-  status: string;
+  claim_code: string | null;
+  type: string | null;
+  status: string | null;
   description: string | null;
   location: string | null;
-  created_at: string;
+  mileage: number | null;
+  created_at: string | null;
   notes: PersistedNote[] | null;
-  clients: { name: string; phone: string | null } | null;
+  feedback_submitted_at: string | null;
+  feedback_rating: number | null;
+  feedback_timeliness: number | null;
+  feedback_professionalism: number | null;
+  feedback_comments: string | null;
+  feedback_resolved: boolean | null;
+  clients: { name: string | null; phone: string | null } | null;
   vehicles: { registration: string } | null;
 };
+
+function parseNotes(raw: unknown): PersistedNote[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (n): n is PersistedNote =>
+      typeof n === 'object' &&
+      n !== null &&
+      typeof (n as Record<string, unknown>).text === 'string' &&
+      typeof (n as Record<string, unknown>).author === 'string' &&
+      typeof (n as Record<string, unknown>).created_at === 'string'
+  );
+}
 
 export default function IncidentDetailPage() {
   const { id } = useParams();
   const { user } = useRole();
-  const { toast } = useToast();
   const [incident, setIncident] = useState<Incident | null>(null);
   const [loading, setLoading] = useState(true);
   const [noteText, setNoteText] = useState('');
   const [savingNote, setSavingNote] = useState(false);
   const [advancing, setAdvancing] = useState(false);
 
-  const fetchIncident = async () => {
+  const fetchIncident = useCallback(async () => {
     if (!id) return;
     const { data } = await supabase
       .from('incidents')
-      .select('id, claim_code, type, status, description, location, created_at, notes, clients(name, phone), vehicles(registration)')
+      .select('id, claim_code, type, status, description, location, mileage, created_at, notes, feedback_submitted_at, feedback_rating, feedback_timeliness, feedback_professionalism, feedback_comments, feedback_resolved, clients(name, phone), vehicles(registration)')
       .eq('id', id)
       .single();
-    setIncident(data as unknown as Incident | null);
+    if (!data) {
+      setIncident(null);
+      setLoading(false);
+      return;
+    }
+    setIncident({
+      ...data,
+      notes: parseNotes(data.notes),
+    } as Incident);
     setLoading(false);
-  };
+  }, [id]);
 
-  useEffect(() => { fetchIncident(); }, [id]);
+  useEffect(() => { fetchIncident(); }, [fetchIncident]);
 
   const handleAdvanceStatus = async () => {
-    if (!incident) return;
+    if (!incident?.status) return;
     const transition = statusTransitions[incident.status];
     if (!transition) return;
     setAdvancing(true);
@@ -78,7 +104,7 @@ export default function IncidentDetailPage() {
       await fetchIncident();
     } catch (err) {
       console.error('Failed to advance incident status:', err);
-      toast({ title: 'Failed to update status', variant: 'destructive' });
+      toast.error('Failed to update status');
     } finally {
       setAdvancing(false);
     }
@@ -100,7 +126,7 @@ export default function IncidentDetailPage() {
       setNoteText('');
     } catch (err) {
       console.error('Failed to save note:', err);
-      toast({ title: 'Failed to save note', variant: 'destructive' });
+      toast.error('Failed to save note');
     } finally {
       setSavingNote(false);
     }
@@ -117,26 +143,26 @@ export default function IncidentDetailPage() {
     );
   }
 
-  const currentStepIndex = statusOrder.indexOf(incident.status);
-  const transition = statusTransitions[incident.status];
+  const currentStepIndex = incident.status ? statusOrder.indexOf(incident.status) : -1;
+  const transition = incident.status ? statusTransitions[incident.status] : undefined;
   const persistedNotes = incident.notes ?? [];
 
   return (
     <div>
-      <Breadcrumbs items={[{ label: 'Home' }, { label: 'Incidents', href: '/incidents' }, { label: incident.claim_code }]} />
+      <Breadcrumbs items={[{ label: 'Home' }, { label: 'Incidents', href: '/incidents' }, { label: incident.claim_code ?? incident.id.slice(0, 8) }]} />
 
       <div className="mb-6">
-        <Link to="/incidents" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3">
+        <Link to="/incidents" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3 transition-colors">
           <ArrowLeft className="h-3.5 w-3.5" /> Back to Incidents
         </Link>
         <div className="flex items-start justify-between">
           <div>
             <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-xl font-semibold font-mono">{incident.claim_code}</h1>
-              <StatusBadge status={incident.status} />
+              <h1 className="text-xl font-semibold font-mono">{incident.claim_code ?? incident.id.slice(0, 8)}</h1>
+              <StatusBadge status={incident.status ?? 'unknown'} />
             </div>
             <p className="text-sm text-muted-foreground">
-              {incident.type} — {incident.vehicles?.registration ?? '—'}
+              {incident.type ?? '—'} — {incident.vehicles?.registration ?? '—'}
             </p>
           </div>
           {transition ? (
@@ -166,7 +192,7 @@ export default function IncidentDetailPage() {
               className="absolute top-[18px] left-[18px] h-[3px] rounded-full transition-all duration-500"
               style={{
                 width: `calc(${(currentStepIndex / (timelineSteps.length - 1)) * 100}% - 36px)`,
-                background: 'linear-gradient(90deg, hsl(142, 72%, 29%), hsl(38, 78%, 52%))',
+                background: 'linear-gradient(90deg, hsl(142, 72%, 29%), hsl(234, 56%, 60%))',
               }}
             />
           )}
@@ -208,7 +234,7 @@ export default function IncidentDetailPage() {
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-muted-foreground shrink-0" />
                 <span className="text-muted-foreground">Type:</span>
-                <span className="font-medium">{incident.type}</span>
+                <span className="font-medium">{incident.type ?? '—'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Car className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -225,6 +251,13 @@ export default function IncidentDetailPage() {
                 <span className="text-muted-foreground">Phone:</span>
                 <span className="font-mono text-xs">{incident.clients?.phone ?? '—'}</span>
               </div>
+              {incident.mileage != null && (
+                <div className="flex items-center gap-2">
+                  <Gauge className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">Mileage:</span>
+                  <span className="font-mono">{incident.mileage.toLocaleString()} km</span>
+                </div>
+              )}
               {incident.location && (
                 <div className="flex items-start gap-2 col-span-2">
                   <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
@@ -250,8 +283,8 @@ export default function IncidentDetailPage() {
             </h3>
             <div className="space-y-3 mb-4 max-h-[240px] overflow-y-auto">
               {persistedNotes.length === 0 && <p className="text-xs text-muted-foreground">No notes yet.</p>}
-              {persistedNotes.map((n, idx) => (
-                <div key={idx} className="rounded-md bg-muted/50 px-3 py-2.5 text-sm">
+              {persistedNotes.map((n) => (
+                <div key={n.created_at + n.author} className="rounded-md bg-muted/50 px-3 py-2.5 text-sm">
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-medium text-xs font-mono">{n.author.length > 16 ? n.author.slice(0, 8) + '…' : n.author}</span>
                     <span className="font-mono text-[10px] text-muted-foreground">
@@ -276,6 +309,46 @@ export default function IncidentDetailPage() {
               </Button>
             </div>
           </div>
+
+          {/* Client Feedback */}
+          {incident.feedback_submitted_at && (
+            <div className="rounded-lg border bg-card p-5">
+              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <Star className="h-4 w-4 text-muted-foreground" />
+                Client Feedback
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-normal">
+                  {new Date(incident.feedback_submitted_at).toLocaleDateString('en-KE')}
+                </span>
+              </h3>
+              <div className="grid grid-cols-3 gap-3 mb-3">
+                {([
+                  { label: 'Overall', value: incident.feedback_rating },
+                  { label: 'Timeliness', value: incident.feedback_timeliness },
+                  { label: 'Professionalism', value: incident.feedback_professionalism },
+                ] as { label: string; value: number | null }[]).map(({ label, value }) => (
+                  <div key={label} className="rounded-md border bg-muted/30 px-3 py-2.5 text-center">
+                    <p className="text-[10px] text-muted-foreground mb-1">{label}</p>
+                    <div className="flex items-center justify-center gap-0.5">
+                      {[1, 2, 3, 4, 5].map(i => (
+                        <Star key={i} className={cn('h-3 w-3', i <= (value ?? 0) ? 'text-amber-500 fill-amber-500' : 'text-muted-foreground')} />
+                      ))}
+                    </div>
+                    <p className="text-xs font-mono font-semibold mt-1">{value ?? '—'}/5</p>
+                  </div>
+                ))}
+              </div>
+              {incident.feedback_resolved != null && (
+                <p className="text-xs text-muted-foreground mb-2">
+                  Issue resolved: <span className={cn('font-medium', incident.feedback_resolved ? 'text-success' : 'text-destructive')}>
+                    {incident.feedback_resolved ? 'Yes' : 'No'}
+                  </span>
+                </p>
+              )}
+              {incident.feedback_comments && (
+                <p className="text-sm text-muted-foreground italic">"{incident.feedback_comments}"</p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Quick Info */}
@@ -285,15 +358,17 @@ export default function IncidentDetailPage() {
             <div className="space-y-2.5 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Claim Code</span>
-                <span className="font-mono font-medium">{incident.claim_code}</span>
+                <span className="font-mono font-medium">{incident.claim_code ?? '—'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Created</span>
-                <span className="font-mono text-xs">{new Date(incident.created_at).toLocaleDateString('en-KE')}</span>
+                <span className="font-mono text-xs">
+                  {incident.created_at ? new Date(incident.created_at).toLocaleDateString('en-KE') : '—'}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Status</span>
-                <StatusBadge status={incident.status} />
+                <StatusBadge status={incident.status ?? 'unknown'} />
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Notes</span>

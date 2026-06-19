@@ -8,7 +8,7 @@ import type { Tables } from '@/integrations/supabase/types';
 
 type Client = Tables<'clients'>;
 
-const cohorts = ['All', 'active', 'pending', 'dormant', 'rejected'];
+const cohorts = ['All', 'active', 'pending_approval', 'dormant', 'rejected'];
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
@@ -48,7 +48,7 @@ export default function ClientsPage() {
         <div className="flex gap-1">
           {cohorts.map(c => (
             <button key={c} onClick={() => setCohortFilter(c)} className={`px-3 py-1.5 text-xs rounded-md font-medium capitalize ${cohortFilter === c ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
-              {c}
+              {c === 'pending_approval' ? 'Pending' : c}
             </button>
           ))}
         </div>

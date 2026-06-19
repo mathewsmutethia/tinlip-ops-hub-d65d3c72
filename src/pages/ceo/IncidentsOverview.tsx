@@ -10,11 +10,11 @@ type Incident = {
   type: string;
   status: string;
   created_at: string;
-  clients: { name: string } | null;
+  clients: { name: string | null } | null;
   vehicles: { registration: string } | null;
 };
 
-const statuses = ['All', 'open', 'in_progress', 'completed', 'closed'];
+const statuses = ['All', 'open', 'in_progress', 'service_assigned', 'completed', 'closed'];
 
 export default function IncidentsOverview() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -46,7 +46,7 @@ export default function IncidentsOverview() {
             onClick={() => setStatusFilter(s)}
             className={cn('px-3 py-1.5 text-xs rounded-md font-medium', statusFilter === s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}
           >
-            {s === 'in_progress' ? 'In Progress' : s.charAt(0).toUpperCase() + s.slice(1)}
+            {s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
           </button>
         ))}
       </div>

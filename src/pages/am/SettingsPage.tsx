@@ -3,12 +3,11 @@ import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useRole } from '@/contexts/RoleContext';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { Lock, User } from 'lucide-react';
 
 export default function SettingsPage() {
   const { user, role } = useRole();
-  const { toast } = useToast();
   const [passwordCooldown, setPasswordCooldown] = useState(false);
 
   const email = user?.email ?? '';
@@ -20,9 +19,9 @@ export default function SettingsPage() {
       await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
-      toast({ title: 'Reset email sent', description: `Check your inbox at ${email}` });
+      toast.success('Reset email sent', { description: `Check your inbox at ${email}` });
     } catch {
-      toast({ title: 'Failed to send reset email', variant: 'destructive' });
+      toast.error('Failed to send reset email');
       setPasswordCooldown(false);
       return;
     }

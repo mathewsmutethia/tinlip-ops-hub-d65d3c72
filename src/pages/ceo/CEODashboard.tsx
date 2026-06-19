@@ -11,6 +11,7 @@ export default function CEODashboard() {
   const [activeClients, setActiveClients] = useState(0);
   const [dormantClients, setDormantClients] = useState(0);
   const [pendingClients, setPendingClients] = useState(0);
+  const [rejectedClients, setRejectedClients] = useState(0);
   const [incidentsCount, setIncidentsCount] = useState(0);
   const [totalPremiums, setTotalPremiums] = useState(0);
   const [cohortData, setCohortData] = useState<{ name: string; value: number }[]>([]);
@@ -26,12 +27,13 @@ export default function CEODashboard() {
       const clients = clientsRes.data ?? [];
       const active = clients.filter(c => c.status === 'active').length;
       const dormant = clients.filter(c => c.status === 'dormant').length;
-      const pending = clients.filter(c => c.status === 'pending').length;
+      const pending = clients.filter(c => c.status === 'pending_approval').length;
       const rejected = clients.filter(c => c.status === 'rejected').length;
 
       setActiveClients(active);
       setDormantClients(dormant);
       setPendingClients(pending);
+      setRejectedClients(rejected);
       setIncidentsCount(incRes.count ?? 0);
 
       setCohortData([
@@ -109,7 +111,7 @@ export default function CEODashboard() {
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <KPICard title="Total Clients" value={loading ? '—' : activeClients + dormantClients + pendingClients} />
+        <KPICard title="Total Clients" value={loading ? '—' : activeClients + dormantClients + pendingClients + rejectedClients} />
         <KPICard title="Pending Onboarding" value={loading ? '—' : pendingClients} />
         <KPICard title="Premiums Collected" value={loading ? '—' : `KES ${totalPremiums.toLocaleString()}`} trendUp />
       </div>
