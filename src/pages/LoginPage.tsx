@@ -11,12 +11,25 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const VALID_ROLES = ['account_manager', 'finance', 'ceo'];
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setError('Invalid email or password.');
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setError('Invalid email or password.');
+      setLoading(false);
+      return;
+    }
+    const role = data.user?.app_metadata?.role;
+    if (!role || !VALID_ROLES.includes(role)) {
+      await supabase.auth.signOut();
+      setError('Access denied. This portal is for Tinlip staff only.');
+      setLoading(false);
+      return;
+    }
     setLoading(false);
   };
 

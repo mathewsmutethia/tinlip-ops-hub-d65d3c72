@@ -51,12 +51,21 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }).catch(() => setLoading(false));
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setIsLoggedIn(!!session);
       if (session?.user) {
-        setRole(resolveRole(session.user.app_metadata?.role));
+        const raw = session.user.app_metadata?.role;
+        if (!VALID_ROLES.includes(raw as UserRole)) {
+          // Non-admin user — sign them out immediately
+          supabase.auth.signOut();
+          return;
+        }
+        setSession(session);
+        setUser(session.user);
+        setIsLoggedIn(true);
+        setRole(resolveRole(raw));
       } else {
+        setSession(null);
+        setUser(null);
+        setIsLoggedIn(false);
         setRole('account_manager');
       }
     });
