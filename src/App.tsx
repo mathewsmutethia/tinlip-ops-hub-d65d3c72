@@ -25,6 +25,7 @@ import FinancialSummary from "@/pages/ceo/FinancialSummary";
 import AuditLogsPage from "@/pages/ceo/AuditLogsPage";
 import ExportReportsPage from "@/pages/ceo/ExportReportsPage";
 import NotFound from "./pages/NotFound";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,7 @@ function AppRoutes() {
   if (!isLoggedIn) {
     return (
       <Routes>
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="*" element={<LoginPage />} />
       </Routes>
     );
@@ -51,6 +53,7 @@ function AppRoutes() {
 
   return (
     <Routes>
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route element={<DashboardLayout />}>
         <Route path="/dashboard" element={<Dashboard />} />
 

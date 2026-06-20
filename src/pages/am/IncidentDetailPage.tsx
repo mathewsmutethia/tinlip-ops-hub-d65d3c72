@@ -9,23 +9,22 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
   ArrowLeft, Phone, MapPin, Car, User, Clock, MessageSquare, Send,
-  CheckCircle2, Circle, AlertTriangle, Wrench, ShieldCheck, Gauge, Star
+  CheckCircle2, Circle, AlertTriangle, ShieldCheck, Gauge, Star
 } from 'lucide-react';
+import type { Json } from '@/integrations/supabase/types';
 
 const timelineSteps = [
-  { key: 'open', label: 'Reported', icon: AlertTriangle },
+  { key: 'pending', label: 'Reported', icon: AlertTriangle },
   { key: 'in_progress', label: 'In Progress', icon: Clock },
-  { key: 'service_assigned', label: 'Service Assigned', icon: Wrench },
   { key: 'completed', label: 'Completed', icon: CheckCircle2 },
   { key: 'closed', label: 'Closed', icon: ShieldCheck },
 ];
 
-const statusOrder = ['open', 'in_progress', 'service_assigned', 'completed', 'closed'];
+const statusOrder = ['pending', 'in_progress', 'completed', 'closed'];
 
 const statusTransitions: Record<string, { next: string; label: string }> = {
-  open: { next: 'in_progress', label: 'Start Working' },
-  in_progress: { next: 'service_assigned', label: 'Assign Service' },
-  service_assigned: { next: 'completed', label: 'Mark Completed' },
+  pending: { next: 'in_progress', label: 'Start Working' },
+  in_progress: { next: 'completed', label: 'Mark Completed' },
   completed: { next: 'closed', label: 'Close Incident' },
 };
 
@@ -81,6 +80,7 @@ export default function IncidentDetailPage() {
       .single();
     if (error) {
       console.error('Failed to load incident:', error);
+      toast.error('Failed to load incident');
       setIncident(null);
       setLoading(false);
       return;
@@ -133,7 +133,7 @@ export default function IncidentDetailPage() {
         created_at: new Date().toISOString(),
       };
       const updatedNotes = [...(incident.notes ?? []), newNote];
-      const { error } = await supabase.from('incidents').update({ notes: updatedNotes } as any).eq('id', incident.id);
+      const { error } = await supabase.from('incidents').update({ notes: updatedNotes as unknown as Json[] }).eq('id', incident.id);
       if (error) throw error;
       setIncident({ ...incident, notes: updatedNotes });
       setNoteText('');
@@ -315,7 +315,7 @@ export default function IncidentDetailPage() {
                 className="flex-1 rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 value={noteText}
                 onChange={e => setNoteText(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && !savingNote && addNote()}
+                onKeyDown={e => { if (e.key === 'Enter' && !savingNote) void addNote(); }}
               />
               <Button size="sm" onClick={addNote} disabled={!noteText.trim() || savingNote}>
                 <Send className="h-3.5 w-3.5 mr-1" /> Add
