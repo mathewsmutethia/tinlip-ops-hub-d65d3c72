@@ -43,8 +43,17 @@ const navItems: Record<UserRole, NavItem[]> = {
   ],
   ceo: [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { label: 'Clients Overview', path: '/clients-overview', icon: Users },
-    { label: 'Incidents Overview', path: '/incidents-overview', icon: Eye },
+    { label: 'Pending Approvals', path: '/approvals', icon: ClipboardCheck, showPendingBadge: true },
+    { label: 'Clients', path: '/clients', icon: Users },
+    { label: 'Vehicles', path: '/vehicles', icon: Car },
+    { label: 'Incidents', path: '/incidents', icon: AlertTriangle },
+    { label: 'Service Providers', path: '/providers', icon: Wrench },
+    { label: 'Invoices', path: '/invoices', icon: FileText },
+    { label: 'Payments', path: '/payments', icon: CreditCard },
+    { label: 'Claims & Payouts', path: '/claims', icon: Receipt },
+    { label: 'Reconciliation', path: '/reconciliation', icon: ArrowLeftRight },
+    { label: 'Reports', path: '/reports', icon: BarChart3 },
+    { label: 'Clients Overview', path: '/clients-overview', icon: Eye },
     { label: 'Financial Summary', path: '/financial-summary', icon: BarChart3 },
     { label: 'Audit Logs', path: '/audit-logs', icon: ScrollText },
     { label: 'Export Reports', path: '/export-reports', icon: Download },
@@ -58,10 +67,10 @@ export function AppSidebar({ collapsed, onToggle }: { collapsed: boolean; onTogg
   const items = navItems[role];
 
   useEffect(() => {
-    if (role !== 'account_manager') return;
+    if (role !== 'account_manager' && role !== 'ceo') return;
     supabase
       .from('clients')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('status', 'pending_approval')
       .then(({ count, error }) => {
         if (!error) setPendingCount(count ?? 0);

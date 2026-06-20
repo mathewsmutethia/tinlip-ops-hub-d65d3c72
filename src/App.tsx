@@ -57,8 +57,8 @@ function AppRoutes() {
       <Route element={<DashboardLayout />}>
         <Route path="/dashboard" element={<Dashboard />} />
 
-        {/* Account Manager */}
-        <Route element={<ProtectedRoute allowedRoles={['account_manager']} />}>
+        {/* Account Manager + CEO */}
+        <Route element={<ProtectedRoute allowedRoles={['account_manager', 'ceo']} />}>
           <Route path="/approvals" element={<PendingApprovals />} />
           <Route path="/clients" element={<ClientsPage />} />
           <Route path="/vehicles" element={<VehiclesPage />} />
@@ -68,8 +68,8 @@ function AppRoutes() {
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
 
-        {/* Finance */}
-        <Route element={<ProtectedRoute allowedRoles={['finance']} />}>
+        {/* Finance + CEO */}
+        <Route element={<ProtectedRoute allowedRoles={['finance', 'ceo']} />}>
           <Route path="/invoices" element={<InvoicesPage />} />
           <Route path="/payments" element={<PaymentsPage />} />
           <Route path="/claims" element={<ClaimsPayoutsPage />} />
@@ -77,7 +77,7 @@ function AppRoutes() {
           <Route path="/reports" element={<ReportsPage />} />
         </Route>
 
-        {/* CEO */}
+        {/* CEO only */}
         <Route element={<ProtectedRoute allowedRoles={['ceo']} />}>
           <Route path="/clients-overview" element={<ClientsOverview />} />
           <Route path="/incidents-overview" element={<IncidentsOverview />} />
