@@ -3,11 +3,11 @@ import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { StatusBadge } from '@/components/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
+import { Search, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Tables } from '@/integrations/supabase/types';
 
-type Client = Tables<'clients'>;
+type Client = Pick<Tables<'clients'>, 'id' | 'name' | 'email' | 'phone' | 'company_name' | 'status' | 'created_at'>;
 
 const cohorts = ['All', 'active', 'pending_approval', 'dormant', 'rejected'];
 
@@ -25,10 +25,9 @@ export default function ClientsPage() {
       .limit(500)
       .then(({ data, error }) => {
         if (error) {
-          console.error('Failed to load clients:', error);
           toast.error('Failed to load clients');
         } else {
-          setClients(data ?? []);
+          setClients((data as Client[]) ?? []);
         }
         setLoading(false);
       });
@@ -54,7 +53,11 @@ export default function ClientsPage() {
         </div>
         <div className="flex gap-1">
           {cohorts.map(c => (
-            <button key={c} onClick={() => setCohortFilter(c)} className={`px-3 py-1.5 text-xs rounded-md font-medium capitalize ${cohortFilter === c ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
+            <button
+              key={c}
+              onClick={() => setCohortFilter(c)}
+              className={`px-3 py-1.5 text-xs rounded-md font-medium capitalize ${cohortFilter === c ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
+            >
               {c === 'pending_approval' ? 'Pending' : c}
             </button>
           ))}
@@ -75,7 +78,11 @@ export default function ClientsPage() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">Loading...</td></tr>
+              <tr>
+                <td colSpan={6} className="px-4 py-12 text-center">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mx-auto" />
+                </td>
+              </tr>
             )}
             {!loading && filtered.map(c => (
               <tr key={c.id} className="border-b hover:bg-table-hover cursor-pointer">
@@ -84,11 +91,15 @@ export default function ClientsPage() {
                 <td className="px-4 py-3 font-mono text-xs">{c.phone ?? '—'}</td>
                 <td className="px-4 py-3">{c.company_name ?? '—'}</td>
                 <td className="px-4 py-3"><StatusBadge status={c.status ?? 'unknown'} /></td>
-                <td className="px-4 py-3 text-muted-foreground">{c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'}</td>
+                <td className="px-4 py-3 text-muted-foreground">
+                  {c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'}
+                </td>
               </tr>
             ))}
             {!loading && filtered.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">No clients found</td></tr>
+              <tr>
+                <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">No clients found</td>
+              </tr>
             )}
           </tbody>
         </table>

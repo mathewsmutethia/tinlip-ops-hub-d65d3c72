@@ -3,9 +3,12 @@ import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { StatusBadge } from '@/components/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { Loader2 } from 'lucide-react';
 import type { Tables } from '@/integrations/supabase/types';
 
-type Vehicle = Tables<'vehicles'> & { clients: { name: string | null } | null };
+type Vehicle = Pick<Tables<'vehicles'>, 'id' | 'registration' | 'make' | 'model' | 'year' | 'mileage' | 'status'> & {
+  clients: Pick<Tables<'clients'>, 'name'> | null;
+};
 
 export default function VehiclesPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -19,7 +22,6 @@ export default function VehiclesPage() {
       .limit(500)
       .then(({ data, error }) => {
         if (error) {
-          console.error('Failed to load vehicles:', error);
           toast.error('Failed to load vehicles');
         } else {
           setVehicles((data as Vehicle[]) ?? []);
@@ -46,7 +48,11 @@ export default function VehiclesPage() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">Loading...</td></tr>
+              <tr>
+                <td colSpan={6} className="px-4 py-12 text-center">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mx-auto" />
+                </td>
+              </tr>
             )}
             {!loading && vehicles.map(v => (
               <tr key={v.id} className="border-b hover:bg-table-hover">
@@ -59,7 +65,9 @@ export default function VehiclesPage() {
               </tr>
             ))}
             {!loading && vehicles.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">No vehicles found</td></tr>
+              <tr>
+                <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">No vehicles found</td>
+              </tr>
             )}
           </tbody>
         </table>

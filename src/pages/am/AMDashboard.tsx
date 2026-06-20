@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { KPICard } from '@/components/KPICard';
 import { supabase } from '@/integrations/supabase/client';
-import { ClipboardCheck, AlertTriangle, Users, ArrowRight } from 'lucide-react';
+import { ClipboardCheck, AlertTriangle, Users, ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
 import type { Tables } from '@/integrations/supabase/types';
 
-type AuditLog = Tables<'audit_logs'>;
+type AuditLog = Pick<Tables<'audit_logs'>, 'id' | 'action' | 'entity_type' | 'entity_id' | 'created_at'>;
 
 export default function AMDashboard() {
   const [pendingClientsCount, setPendingClientsCount] = useState(0);
@@ -18,18 +19,26 @@ export default function AMDashboard() {
 
   useEffect(() => {
     Promise.all([
-      supabase.from('clients').select('*', { count: 'exact', head: true }).eq('status', 'pending_approval'),
-      supabase.from('incidents').select('*', { count: 'exact', head: true }).in('status', ['open', 'in_progress', 'service_assigned']),
-      supabase.from('clients').select('*', { count: 'exact', head: true }),
+      supabase.from('clients').select('id', { count: 'exact', head: true }).eq('status', 'pending_approval'),
+      supabase.from('incidents').select('id', { count: 'exact', head: true }).in('status', ['pending', 'in_progress']),
+      supabase.from('clients').select('id', { count: 'exact', head: true }),
       supabase.from('audit_logs').select('id, action, entity_type, entity_id, created_at').order('created_at', { ascending: false }).limit(8),
     ]).then(([pending, activeInc, total, logs]) => {
-      if (!pending.error) setPendingClientsCount(pending.count ?? 0);
-      if (!activeInc.error) setActiveIncidentsCount(activeInc.count ?? 0);
-      if (!total.error) setTotalClientsCount(total.count ?? 0);
-      if (!logs.error) setRecentLogs(logs.data ?? []);
+      if (pending.error) toast.error('Failed to load pending approvals');
+      else setPendingClientsCount(pending.count ?? 0);
+
+      if (activeInc.error) toast.error('Failed to load active incidents');
+      else setActiveIncidentsCount(activeInc.count ?? 0);
+
+      if (total.error) toast.error('Failed to load total clients');
+      else setTotalClientsCount(total.count ?? 0);
+
+      if (logs.error) toast.error('Failed to load recent activity');
+      else setRecentLogs((logs.data ?? []) as AuditLog[]);
+
       setLoading(false);
-    }).catch(err => {
-      console.error('Dashboard load failed:', err);
+    }).catch(() => {
+      toast.error('Dashboard failed to load');
       setLoading(false);
     });
   }, []);
@@ -64,8 +73,14 @@ export default function AMDashboard() {
         <div className="rounded-lg border bg-card p-4">
           <h3 className="text-sm font-semibold mb-3">Recent Activity</h3>
           <div className="space-y-3">
-            {loading && <p className="text-sm text-muted-foreground">Loading...</p>}
-            {!loading && recentLogs.length === 0 && <p className="text-sm text-muted-foreground">No recent activity</p>}
+            {loading && (
+              <div className="flex justify-center py-4">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            )}
+            {!loading && recentLogs.length === 0 && (
+              <p className="text-sm text-muted-foreground">No recent activity</p>
+            )}
             {recentLogs.map(log => (
               <div key={log.id} className="flex gap-3 text-sm">
                 <span className="font-mono text-xs text-muted-foreground shrink-0 w-20">
@@ -73,7 +88,9 @@ export default function AMDashboard() {
                 </span>
                 <div>
                   <p className="text-foreground">{log.action ?? '—'}</p>
-                  <p className="text-xs text-muted-foreground">{log.entity_type ?? ''} {log.entity_id ? `· ${log.entity_id.slice(0, 8)}` : ''}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {log.entity_type ?? ''}{log.entity_id ? ` · ${log.entity_id.slice(0, 8)}` : ''}
+                  </p>
                 </div>
               </div>
             ))}
