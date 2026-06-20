@@ -3,7 +3,8 @@ import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { StatusBadge } from '@/components/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 type Client = {
   id: string;
@@ -14,7 +15,13 @@ type Client = {
   created_at: string | null;
 };
 
-const statuses = ['All', 'active', 'pending_approval', 'dormant', 'rejected'];
+const statuses = ['All', 'active', 'pending_approval', 'profile_incomplete', 'rejected'];
+
+function statusLabel(s: string): string {
+  if (s === 'pending_approval') return 'Pending';
+  if (s === 'profile_incomplete') return 'Incomplete';
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
 export default function ClientsOverview() {
   const [clients, setClients] = useState<Client[]>([]);
@@ -28,8 +35,8 @@ export default function ClientsOverview() {
       .order('created_at', { ascending: false })
       .limit(500)
       .then(({ data, error }) => {
-        if (error) console.error('Failed to load clients:', error);
-        else setClients((data as Client[]) ?? []);
+        if (error) { toast.error('Failed to load clients'); }
+        else { setClients((data as Client[]) ?? []); }
         setLoading(false);
       });
   }, []);
@@ -71,14 +78,16 @@ export default function ClientsOverview() {
             onClick={() => setStatusFilter(s)}
             className={`px-3 py-1.5 text-xs rounded-md font-medium ${statusFilter === s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
           >
-            {s === 'pending_approval' ? 'Pending' : s.charAt(0).toUpperCase() + s.slice(1)}
+            {statusLabel(s)}
           </button>
         ))}
       </div>
 
       <div className="rounded-lg border bg-card overflow-hidden">
         {loading ? (
-          <div className="px-4 py-8 text-center text-sm text-muted-foreground">Loading...</div>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
         ) : filtered.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-muted-foreground">No clients found.</div>
         ) : (

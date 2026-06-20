@@ -2,14 +2,12 @@ import { useState, useEffect } from 'react';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { KPICard } from '@/components/KPICard';
 import { supabase } from '@/integrations/supabase/client';
+import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import type { Tables } from '@/integrations/supabase/types';
 
-type Payment = {
-  id: string;
-  amount: number | null;
-  status: string | null;
-  created_at: string | null;
-};
+type Payment = Pick<Tables<'payments'>, 'id' | 'amount' | 'status' | 'created_at'>;
 
 type MonthlyData = {
   month: string;
@@ -27,8 +25,8 @@ export default function FinancialSummary() {
       .select('id, amount, status, created_at')
       .limit(1000)
       .then(({ data, error }) => {
-        if (error) console.error('Failed to load payments:', error);
-        else setPayments((data as Payment[]) ?? []);
+        if (error) { toast.error('Failed to load payments'); }
+        else { setPayments((data as Payment[]) ?? []); }
         setLoading(false);
       });
   }, []);
@@ -56,7 +54,9 @@ export default function FinancialSummary() {
       <h1 className="text-xl font-semibold mb-5">Financial Summary</h1>
 
       {loading ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
       ) : (
         <>
           <div className="grid grid-cols-3 gap-4 mb-6">

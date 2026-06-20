@@ -2,10 +2,14 @@ import { useState, useEffect } from 'react';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { StatusBadge } from '@/components/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
+import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { Tables } from '@/integrations/supabase/types';
 
-type Payment = Tables<'payments'> & { clients: { name: string | null } | null };
+type Payment = Pick<Tables<'payments'>, 'id' | 'amount' | 'status' | 'created_at' | 'stk_reference' | 'coverage_start' | 'coverage_end'> & {
+  clients: { name: string | null } | null;
+};
 
 const tabs = ['All', 'pending', 'confirmed', 'failed'];
 
@@ -21,8 +25,8 @@ export default function PaymentsPage() {
       .order('created_at', { ascending: false })
       .limit(500)
       .then(({ data, error }) => {
-        if (error) console.error('Failed to load payments:', error);
-        else setPayments((data as Payment[]) ?? []);
+        if (error) { toast.error('Failed to load payments'); }
+        else { setPayments((data as Payment[]) ?? []); }
         setLoading(false);
       });
   }, []);
@@ -55,7 +59,13 @@ export default function PaymentsPage() {
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">Loading...</td></tr>}
+            {loading && (
+              <tr>
+                <td colSpan={6} className="px-4 py-12 text-center">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mx-auto" />
+                </td>
+              </tr>
+            )}
             {!loading && filtered.map(p => (
               <tr key={p.id} className={cn('border-b hover:bg-table-hover', p.status === 'failed' && 'bg-destructive/5')}>
                 <td className="px-4 py-3 font-mono text-xs">{p.stk_reference ?? '—'}</td>
@@ -69,7 +79,11 @@ export default function PaymentsPage() {
                 <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{p.created_at ? new Date(p.created_at).toLocaleDateString() : '—'}</td>
               </tr>
             ))}
-            {!loading && filtered.length === 0 && <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">No payments found</td></tr>}
+            {!loading && filtered.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">No payments found</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

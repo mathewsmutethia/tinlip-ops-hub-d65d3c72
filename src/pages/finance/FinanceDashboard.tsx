@@ -2,11 +2,14 @@ import { useEffect, useState } from 'react';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { KPICard } from '@/components/KPICard';
 import { supabase } from '@/integrations/supabase/client';
-import { Banknote, FileWarning, Receipt, TrendingUp } from 'lucide-react';
+import { Banknote, FileWarning, Receipt, TrendingUp, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import type { Tables } from '@/integrations/supabase/types';
 
-type Payment = Tables<'payments'> & { clients: { name: string | null } | null };
+type Payment = Pick<Tables<'payments'>, 'id' | 'amount' | 'status' | 'created_at' | 'stk_reference'> & {
+  clients: { name: string | null } | null;
+};
 
 export default function FinanceDashboard() {
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -19,8 +22,8 @@ export default function FinanceDashboard() {
       .order('created_at', { ascending: false })
       .limit(1000)
       .then(({ data, error }) => {
-        if (error) console.error('Failed to load payments:', error);
-        else setPayments((data as Payment[]) ?? []);
+        if (error) { toast.error('Failed to load payments'); }
+        else { setPayments((data as Payment[]) ?? []); }
         setLoading(false);
       });
   }, []);
@@ -59,7 +62,9 @@ export default function FinanceDashboard() {
         <div className="col-span-2 rounded-lg border bg-card p-5">
           <h3 className="text-sm font-semibold mb-4">Premiums Collected by Month</h3>
           {loading ? (
-            <div className="h-[280px] flex items-center justify-center text-muted-foreground text-sm">Loading...</div>
+            <div className="h-[280px] flex items-center justify-center">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
           ) : chartData.length === 0 ? (
             <div className="h-[280px] flex items-center justify-center text-muted-foreground text-sm">No payment data yet</div>
           ) : (
@@ -79,7 +84,11 @@ export default function FinanceDashboard() {
         <div className="rounded-lg border bg-card p-5">
           <h3 className="text-sm font-semibold mb-3">Recent Payments</h3>
           <div className="space-y-3">
-            {loading && <p className="text-sm text-muted-foreground">Loading...</p>}
+            {loading && (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            )}
             {!loading && payments.slice(0, 5).map(p => (
               <div key={p.id} className="flex items-center justify-between text-sm border-b pb-2 last:border-0">
                 <div>

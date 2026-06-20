@@ -2,16 +2,11 @@ import { useState, useEffect } from 'react';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import type { Tables } from '@/integrations/supabase/types';
 
-type AuditLog = {
-  id: string;
-  action: string | null;
-  entity_type: string | null;
-  entity_id: string | null;
-  user_id: string | null;
-  created_at: string | null;
-};
+type AuditLog = Pick<Tables<'audit_logs'>, 'id' | 'action' | 'entity_type' | 'entity_id' | 'user_id' | 'created_at'>;
 
 export default function AuditLogsPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -24,8 +19,8 @@ export default function AuditLogsPage() {
       .order('created_at', { ascending: false })
       .limit(500)
       .then(({ data, error }) => {
-        if (error) console.error('Failed to load audit logs:', error);
-        else setLogs((data as AuditLog[]) ?? []);
+        if (error) { toast.error('Failed to load audit logs'); }
+        else { setLogs((data as AuditLog[]) ?? []); }
         setLoading(false);
       });
   }, []);
@@ -60,7 +55,9 @@ export default function AuditLogsPage() {
 
       <div className="rounded-lg border bg-card overflow-hidden">
         {loading ? (
-          <div className="px-4 py-8 text-center text-sm text-muted-foreground">Loading...</div>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
         ) : logs.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-muted-foreground">No audit logs recorded yet.</div>
         ) : (

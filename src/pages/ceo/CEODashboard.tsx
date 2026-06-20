@@ -2,14 +2,15 @@ import { useEffect, useState } from 'react';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { KPICard } from '@/components/KPICard';
 import { supabase } from '@/integrations/supabase/client';
-import { Users, AlertTriangle, TrendingUp, UserX } from 'lucide-react';
+import { Users, AlertTriangle, TrendingUp, UserCheck, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
 const COLORS = ['hsl(142, 76%, 36%)', 'hsl(38, 78%, 52%)', 'hsl(200, 80%, 50%)', 'hsl(0, 72%, 51%)'];
 
 export default function CEODashboard() {
   const [activeClients, setActiveClients] = useState(0);
-  const [dormantClients, setDormantClients] = useState(0);
+  const [incompleteClients, setIncompleteClients] = useState(0);
   const [pendingClients, setPendingClients] = useState(0);
   const [rejectedClients, setRejectedClients] = useState(0);
   const [incidentsCount, setIncidentsCount] = useState(0);
@@ -21,24 +22,28 @@ export default function CEODashboard() {
   useEffect(() => {
     Promise.all([
       supabase.from('clients').select('status'),
-      supabase.from('incidents').select('*', { count: 'exact', head: true }),
+      supabase.from('incidents').select('id', { count: 'exact', head: true }),
       supabase.from('payments').select('amount, created_at, status'),
     ]).then(([clientsRes, incRes, paymentsRes]) => {
+      if (clientsRes.error) { toast.error('Failed to load client data'); return; }
+      if (incRes.error) { toast.error('Failed to load incident data'); return; }
+      if (paymentsRes.error) { toast.error('Failed to load payment data'); return; }
+
       const clients = clientsRes.data ?? [];
       const active = clients.filter(c => c.status === 'active').length;
-      const dormant = clients.filter(c => c.status === 'dormant').length;
+      const incomplete = clients.filter(c => c.status === 'profile_incomplete').length;
       const pending = clients.filter(c => c.status === 'pending_approval').length;
       const rejected = clients.filter(c => c.status === 'rejected').length;
 
       setActiveClients(active);
-      setDormantClients(dormant);
+      setIncompleteClients(incomplete);
       setPendingClients(pending);
       setRejectedClients(rejected);
       setIncidentsCount(incRes.count ?? 0);
 
       setCohortData([
         { name: 'Active', value: active },
-        { name: 'Dormant', value: dormant },
+        { name: 'Incomplete', value: incomplete },
         { name: 'Pending', value: pending },
         { name: 'Rejected', value: rejected },
       ].filter(c => c.value > 0));
@@ -68,14 +73,16 @@ export default function CEODashboard() {
         <KPICard title="Active Clients" value={loading ? '—' : activeClients} icon={<Users className="h-5 w-5" />} />
         <KPICard title="Total Incidents" value={loading ? '—' : incidentsCount} icon={<AlertTriangle className="h-5 w-5" />} />
         <KPICard title="Premiums Collected" value={loading ? '—' : `KES ${totalPremiums.toLocaleString()}`} icon={<TrendingUp className="h-5 w-5" />} />
-        <KPICard title="Dormant Clients" value={loading ? '—' : dormantClients} icon={<UserX className="h-5 w-5" />} danger />
+        <KPICard title="Pending Onboarding" value={loading ? '—' : pendingClients} icon={<UserCheck className="h-5 w-5" />} />
       </div>
 
       <div className="grid grid-cols-2 gap-6 mb-6">
         <div className="rounded-lg border bg-card p-5">
           <h3 className="text-sm font-semibold mb-4">Client Status Breakdown</h3>
           {loading ? (
-            <div className="h-[250px] flex items-center justify-center text-muted-foreground text-sm">Loading...</div>
+            <div className="h-[250px] flex items-center justify-center">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
           ) : cohortData.length === 0 ? (
             <div className="h-[250px] flex items-center justify-center text-muted-foreground text-sm">No clients yet</div>
           ) : (
@@ -93,7 +100,9 @@ export default function CEODashboard() {
         <div className="rounded-lg border bg-card p-5">
           <h3 className="text-sm font-semibold mb-4">Monthly Premiums</h3>
           {loading ? (
-            <div className="h-[250px] flex items-center justify-center text-muted-foreground text-sm">Loading...</div>
+            <div className="h-[250px] flex items-center justify-center">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
           ) : paymentsByMonth.length === 0 ? (
             <div className="h-[250px] flex items-center justify-center text-muted-foreground text-sm">No payment data yet</div>
           ) : (
@@ -111,7 +120,7 @@ export default function CEODashboard() {
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <KPICard title="Total Clients" value={loading ? '—' : activeClients + dormantClients + pendingClients + rejectedClients} />
+        <KPICard title="Total Clients" value={loading ? '—' : activeClients + incompleteClients + pendingClients + rejectedClients} />
         <KPICard title="Pending Onboarding" value={loading ? '—' : pendingClients} />
         <KPICard title="Premiums Collected" value={loading ? '—' : `KES ${totalPremiums.toLocaleString()}`} trendUp />
       </div>

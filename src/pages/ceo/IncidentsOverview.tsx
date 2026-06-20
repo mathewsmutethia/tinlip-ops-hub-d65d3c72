@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { StatusBadge } from '@/components/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
+import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 type Incident = {
@@ -14,7 +16,7 @@ type Incident = {
   vehicles: { registration: string } | null;
 };
 
-const statuses = ['All', 'open', 'in_progress', 'service_assigned', 'completed', 'closed'];
+const statuses = ['All', 'pending', 'in_progress', 'completed', 'closed'];
 
 export default function IncidentsOverview() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -28,8 +30,8 @@ export default function IncidentsOverview() {
       .order('created_at', { ascending: false })
       .limit(500)
       .then(({ data, error }) => {
-        if (error) console.error('Failed to load incidents:', error);
-        else setIncidents((data as Incident[]) ?? []);
+        if (error) { toast.error('Failed to load incidents'); }
+        else { setIncidents((data as Incident[]) ?? []); }
         setLoading(false);
       });
   }, []);
@@ -55,7 +57,9 @@ export default function IncidentsOverview() {
 
       <div className="rounded-lg border bg-card overflow-hidden">
         {loading ? (
-          <div className="px-4 py-8 text-center text-sm text-muted-foreground">Loading...</div>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
         ) : filtered.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-muted-foreground">No incidents found.</div>
         ) : (

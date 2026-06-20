@@ -4,11 +4,13 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Plus } from 'lucide-react';
+import { Plus, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import type { Tables } from '@/integrations/supabase/types';
 
-// Invoices are derived from payments joined with clients
-type Payment = Tables<'payments'> & { clients: { name: string | null } | null };
+type Payment = Pick<Tables<'payments'>, 'id' | 'amount' | 'status' | 'created_at' | 'coverage_start' | 'coverage_end'> & {
+  clients: { name: string | null } | null;
+};
 
 const tabs = ['All', 'pending', 'confirmed', 'failed'];
 
@@ -24,8 +26,8 @@ export default function InvoicesPage() {
       .order('created_at', { ascending: false })
       .limit(500)
       .then(({ data, error }) => {
-        if (error) console.error('Failed to load invoices:', error);
-        else setPayments((data as Payment[]) ?? []);
+        if (error) { toast.error('Failed to load invoices'); }
+        else { setPayments((data as Payment[]) ?? []); }
         setLoading(false);
       });
   }, []);
@@ -61,7 +63,13 @@ export default function InvoicesPage() {
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">Loading...</td></tr>}
+            {loading && (
+              <tr>
+                <td colSpan={6} className="px-4 py-12 text-center">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mx-auto" />
+                </td>
+              </tr>
+            )}
             {!loading && filtered.map(p => (
               <tr key={p.id} className="border-b hover:bg-table-hover">
                 <td className="px-4 py-3 font-mono font-medium text-primary text-xs">{p.id.slice(0, 12)}...</td>
@@ -75,7 +83,11 @@ export default function InvoicesPage() {
                 <td className="px-4 py-3"><StatusBadge status={p.status ?? 'unknown'} /></td>
               </tr>
             ))}
-            {!loading && filtered.length === 0 && <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">No records found</td></tr>}
+            {!loading && filtered.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">No records found</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

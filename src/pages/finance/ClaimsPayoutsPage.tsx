@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { StatusBadge } from '@/components/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
+import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 type Incident = {
   id: string;
@@ -24,8 +26,8 @@ export default function ClaimsPayoutsPage() {
       .order('created_at', { ascending: false })
       .limit(500)
       .then(({ data, error }) => {
-        if (error) console.error('Failed to load claims:', error);
-        else setIncidents((data as Incident[]) ?? []);
+        if (error) { toast.error('Failed to load claims'); }
+        else { setIncidents((data as Incident[]) ?? []); }
         setLoading(false);
       });
   }, []);
@@ -37,7 +39,9 @@ export default function ClaimsPayoutsPage() {
 
       <div className="rounded-lg border bg-card overflow-hidden">
         {loading ? (
-          <div className="px-4 py-8 text-center text-sm text-muted-foreground">Loading...</div>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
         ) : incidents.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-muted-foreground">No claims recorded yet.</div>
         ) : (
