@@ -218,6 +218,39 @@ export type Database = {
           },
         ]
       }
+      otp_records: {
+        Row: {
+          attempts: number
+          created_at: string
+          expires_at: string
+          id: string
+          otp_hash: string
+          otp_token: string
+          used: boolean
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          expires_at?: string
+          id?: string
+          otp_hash: string
+          otp_token: string
+          used?: boolean
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          expires_at?: string
+          id?: string
+          otp_hash?: string
+          otp_token?: string
+          used?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number | null
@@ -363,6 +396,7 @@ export type Database = {
         Args: { p_otp_hash: string; p_otp_token: string; p_user_id: string }
         Returns: Json
       }
+      is_admin: { Args: never; Returns: boolean }
       verify_and_invalidate_otp: {
         Args: { p_input_hash: string; p_otp_token: string; p_user_id: string }
         Returns: Json
