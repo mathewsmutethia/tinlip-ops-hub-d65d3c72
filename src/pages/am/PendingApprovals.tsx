@@ -91,7 +91,7 @@ export default function PendingApprovals() {
       entity_id: entityId,
       user_id: user?.id ?? null,
     });
-    if (error) console.error('Audit log write failed:', error);
+    if (error) throw new Error(`Audit log write failed: ${error.message}`);
   };
 
   const createCoverageForVehicle = async (clientId: string, vehicleId: string) => {
